@@ -100,6 +100,7 @@ filelistaanime = "./listaanime2.txt"
 arrayanime = []
 num_parts = 8
 loglevel = 1  #1 info, 2 debug
+rootfolder = "/mnt/user/Storage/media/"
 
 arrayanime = leggere_file(filelistaanime)
 normalizzanumero(arrayanime)
@@ -113,7 +114,7 @@ for riga in range(len(arrayanime)):
 
     if response.status_code == 200:
       print(url)
-      filename = arrayanime[riga][3] + url.split("/")[-1]
+      filename = rootfolder + arrayanime[riga][3] + url.split("/")[-1]
       file_size = int(response.headers['Content-Length'])
       scrivilogfile("Dimensione file su server " + str(file_size), 2)
       # Split file into 8 parts
