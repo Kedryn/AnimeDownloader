@@ -102,10 +102,15 @@ num_parts = 8
 loglevel = 1  #1 info, 2 debug
 rootfolder = "/mnt/user/Storage/media/"
 
+if os.path.exists('log.txt'):
+  os.remove('log.txt')
+
 arrayanime = leggere_file(filelistaanime)
 normalizzanumero(arrayanime)
 for riga in range(len(arrayanime)):
   ripeti = 1
+  if arrayanime[riga][1] > arrayanime[riga][2]:
+    scrivilogfile(filename + " ENDED", 1)
   while ripeti == 1 and arrayanime[riga][1] <= arrayanime[riga][2]:
     url = arrayanime[riga][0].replace("*", arrayanime[riga][1])
 
