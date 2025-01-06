@@ -111,6 +111,7 @@ for riga in range(len(arrayanime)):
   ripeti = 1
   if arrayanime[riga][1] > arrayanime[riga][2]:
     scrivilogfile(arrayanime[riga][4] + " ENDED", 1)
+    
   while ripeti == 1 and arrayanime[riga][1] <= arrayanime[riga][2]:
     url = arrayanime[riga][0].replace("*", arrayanime[riga][1])
 
