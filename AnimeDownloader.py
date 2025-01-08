@@ -59,7 +59,6 @@ def sanitizzariga(rigaarrayanime):
   """
     vari controlli su possibili errori del file di config
   """
-  lunghezzacifre = 2
   lunghezzacifre = len(rigaarrayanime[2])
   rigaarrayanime[1] = str(int(rigaarrayanime[1])).zfill(lunghezzacifre)
 
@@ -126,7 +125,7 @@ for riga in range(len(arrayanime)):
     scrivilogfile(arrayanime[riga][4] + " ENDED", 1)
 
   ###DA FARE leggere lunghezza cifre da file conf
-  sanitizzariga(arrayanime[riga], lunghezzacifre) 
+  sanitizzariga(arrayanime[riga]) 
 
   while ripeti == 1 and arrayanime[riga][1] <= arrayanime[riga][2]:
     url = arrayanime[riga][0].replace("*", arrayanime[riga][1])
