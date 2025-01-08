@@ -33,17 +33,14 @@ def download_file(url, nome_file, start_byte, end_byte, part_index):
   """
   my_referer = "https://server56.streamingaw.online/"
   headers = {'referer': my_referer, 'Range': f'bytes={start_byte}-{end_byte}'}
-  try:
-    response = requests.get(url, headers=headers, stream=True)
-  except requests.exceptions.HTTPError as http_err:    
-    if response.status_code == 206:
-      with open(f"part_{part_index}", 'wb') as f:
-        for chunk in response.iter_content(chunk_size=1024):
-          f.write(chunk)
-      return 0
-    else:
-      print(f"HTTP error occurred: {http_err}")
-  return response.status_code
+  response = requests.get(url, headers=headers, stream=True)
+  if response.status_code == 206:
+    with open(f"part_{part_index}", 'wb') as f:
+      for chunk in response.iter_content(chunk_size=1024):
+        f.write(chunk)
+    return 0
+  else:
+    return response.status_code
 
 
 def normalizzanumero(arrayanime):
@@ -117,9 +114,13 @@ for riga in range(len(arrayanime)):
     
   while ripeti == 1 and arrayanime[riga][1] <= arrayanime[riga][2]:
     url = arrayanime[riga][0].replace("*", arrayanime[riga][1])
-
-    response = requests.head(url)
+    try:
+      response = requests.head(url)
+    except requests.exceptions.HTTPError as http_err:
+      print(f"HTTP error occurred: {http_err}")
     # Get file size
+    except Exception as err:
+      print(f"An error occurred: {err}")
 
     if response.status_code == 200:
       print(url)
