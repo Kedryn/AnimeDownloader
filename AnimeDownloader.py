@@ -44,16 +44,6 @@ def download_file(url, nome_file, start_byte, end_byte, part_index):
     return response.status_code
 
 
-def normalizzanumero(arrayanime):
-  """
-    porta a 2 cifre il numero di episodi di un anime.
-  """
-  for riga in range(len(arrayanime)):
-    #for colonna in range(len(arrayanime[riga])):
-    #if colonna == 1 and len(str(arrayanime[riga][colonna])) == 1:
-    #arrayanime[riga][1] = "0" + str(arrayanime[riga][1])
-    arrayanime[riga][1] = str(int(arrayanime[riga][1])).zfill(2)
-  return arrayanime
 
 def sanitizzariga(rigaarrayanime):
   """
@@ -117,7 +107,6 @@ if os.path.exists('log.txt'):
   os.remove('log.txt')
 
 arrayanime = leggere_file(filelistaanime)
-#normalizzanumero(arrayanime)
 
 for riga in range(len(arrayanime)):
   ripeti = 1
