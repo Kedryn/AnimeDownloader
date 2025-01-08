@@ -120,7 +120,7 @@ for riga in range(len(arrayanime)):
       print(f"HTTP error occurred: {http_err}")
     # Get file size
     except Exception as err:
-      scrivilogfile("Dominio inesistente, anime SPOSTATO",)
+      scrivilogfile("Dominio inesistente, " + arrayanime[riga][4] + " SPOSTATO",1)
 
     if response.status_code == 200:
       print(url)
