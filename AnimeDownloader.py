@@ -59,7 +59,7 @@ def sanitizzariga(rigaarrayanime):
   """
     vari controlli su possibili errori del file di config
   """
-
+  lunghezzacifre = 2
   lunghezzacifre = len(rigaarrayanime[2])
   rigaarrayanime[1] = str(int(rigaarrayanime[1])).zfill(lunghezzacifre)
 
