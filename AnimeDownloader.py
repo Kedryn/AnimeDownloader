@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import datetime
 import requests
 import os
@@ -54,6 +55,13 @@ def normalizzanumero(arrayanime):
     arrayanime[riga][1] = str(int(arrayanime[riga][1])).zfill(2)
   return arrayanime
 
+def sanitizzariga(rigaarrayanime,lunghezzacifre):
+  """
+    vari controlli su possibili errori del file di config
+  """
+  rigaarrayanime[1] = str(int(rigaarrayanime[1])).zfill(lunghezzacifre)
+  if not rigaarrayanime[3].endswith('/'):
+    rigaarrayanime[3] += '/'
 
 def salvarisultato(arrayanime, filename):
   """
@@ -101,17 +109,22 @@ arrayanime = []
 num_parts = 8
 loglevel = 1  #1 info, 2 debug
 rootfolder = "/mnt/user/Storage/media/"
+lunghezzacifre = 2
 
 if os.path.exists('log.txt'):
   os.remove('log.txt')
 
 arrayanime = leggere_file(filelistaanime)
-normalizzanumero(arrayanime)
+#normalizzanumero(arrayanime)
+
 for riga in range(len(arrayanime)):
   ripeti = 1
   if arrayanime[riga][1] > arrayanime[riga][2]:
     scrivilogfile(arrayanime[riga][4] + " ENDED", 1)
-    
+
+  ###DA FARE leggere lunghezza cifre da file conf
+  sanitizzariga(arrayanime[riga], lunghezzacifre) 
+
   while ripeti == 1 and arrayanime[riga][1] <= arrayanime[riga][2]:
     url = arrayanime[riga][0].replace("*", arrayanime[riga][1])
     try:
