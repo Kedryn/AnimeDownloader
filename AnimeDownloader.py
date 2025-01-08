@@ -55,13 +55,17 @@ def normalizzanumero(arrayanime):
     arrayanime[riga][1] = str(int(arrayanime[riga][1])).zfill(2)
   return arrayanime
 
-def sanitizzariga(rigaarrayanime,lunghezzacifre):
+def sanitizzariga(rigaarrayanime):
   """
     vari controlli su possibili errori del file di config
   """
+
+  lunghezzacifre = len(rigaarrayanime[2])
   rigaarrayanime[1] = str(int(rigaarrayanime[1])).zfill(lunghezzacifre)
+
   if not rigaarrayanime[3].endswith('/'):
     rigaarrayanime[3] += '/'
+  return rigaarrayanime
 
 def salvarisultato(arrayanime, filename):
   """
@@ -109,7 +113,6 @@ arrayanime = []
 num_parts = 8
 loglevel = 1  #1 info, 2 debug
 rootfolder = "/mnt/user/Storage/media/"
-lunghezzacifre = 2
 
 if os.path.exists('log.txt'):
   os.remove('log.txt')
