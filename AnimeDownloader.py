@@ -161,7 +161,7 @@ for riga in range(len(arrayanime)):
       if os.path.exists(filename) and os.path.getsize(filename) == file_size:
 
         arrayanime[riga][1] = int(arrayanime[riga][1]) + 1
-        normalizzanumero(arrayanime)
+        sanitizzariga(arrayanime[riga])
         scrivilogfile(filename + " scaricato con successo", 1)
         ripeti = 1
       else:
