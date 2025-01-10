@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/python3
 import datetime
 import requests
 import os
@@ -152,6 +152,8 @@ for riga in range(len(arrayanime)):
         thread.join()
 
       assemble_file(num_parts, filename)
+      os.chown(filename, -1, -1)  # Change owner to nobody:users
+      
       scrivilogfile(
           "Dimensione file scaricato " + str(os.path.getsize(filename)), 2)
 
