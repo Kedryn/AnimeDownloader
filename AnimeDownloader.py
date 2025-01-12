@@ -66,15 +66,16 @@ def salvarisultato(arrayanime, filename):
       f.write('#'.join(riga) + '\n')
 
 
-def scrivilogfile(testo, loglv):
+def scrivilogfile(testo, loglv,typelog,colorlog):
   """
     scrive il testo nel file log.txt
   """
+  
   current_datetime = datetime.datetime.now()
   formatted_datetime = current_datetime.strftime("%Y-%m-%d %H:%M:%S")
   if loglv <= loglevel:
     with open('log.txt', 'a') as f:
-      f.write('[' + formatted_datetime + ']' + testo + '\n')
+      f.write('[' + formatted_datetime + ']['+ typelog+']' + testo + '\n')
 
 
 def download_part(url, nome_file, start_byte, end_byte, i):
@@ -83,10 +84,10 @@ def download_part(url, nome_file, start_byte, end_byte, i):
   """
   response = download_file(url, nome_file, start_byte, end_byte, i)
   if response == 0:
-    scrivilogfile(f"Parte {start_byte}-{end_byte} scaricata con successo", 2)
+    scrivilogfile(f"Parte {start_byte}-{end_byte} scaricata con successo", 2,'INFO',green)
   else:
     scrivilogfile(
-        f"Errore durante il download della parte {start_byte}-{end_byte}", 2)
+        f"Errore durante il download della parte {start_byte}-{end_byte}", 2,'ERROR',red)
 
 
 def assemble_file(num_parts, output_file):
@@ -96,6 +97,12 @@ def assemble_file(num_parts, output_file):
         output.write(part.read())
       os.remove(f"part_{i}")
 
+green = '\033[92m'
+red = '\033[91m'
+cyan = '\033[96m'
+yellow = '\033[93m'
+reset = '\033[0m'
+  
 
 filelistaanime = "./listaanime2.txt"
 arrayanime = []
@@ -111,7 +118,7 @@ arrayanime = leggere_file(filelistaanime)
 for riga in range(len(arrayanime)):
   ripeti = 1
   if arrayanime[riga][1] > arrayanime[riga][2]:
-    scrivilogfile(arrayanime[riga][4] + " ENDED", 1)
+    scrivilogfile(arrayanime[riga][4] + " ENDED", 1,'WARN',yellow)
 
   ###DA FARE leggere lunghezza cifre da file conf
   sanitizzariga(arrayanime[riga]) 
@@ -124,13 +131,13 @@ for riga in range(len(arrayanime)):
       print(f"HTTP error occurred: {http_err}")
     # Get file size
     except Exception as err:
-      scrivilogfile("Dominio inesistente, " + arrayanime[riga][4] + " SPOSTATO",1)
+      scrivilogfile("Dominio inesistente, " + arrayanime[riga][4] + " SPOSTATO",1,'ERROR',red)
 
     if response.status_code == 200:
       print(url)
       filename = rootfolder + arrayanime[riga][3] + url.split("/")[-1]
       file_size = int(response.headers['Content-Length'])
-      scrivilogfile("Dimensione file su server " + str(file_size), 2)
+      scrivilogfile("Dimensione file su server " + str(file_size), 2,'DEBUG',cyan)
       # Split file into 8 parts
       part_size = file_size // num_parts
       # Last part must contain spare bytes from division
@@ -155,21 +162,20 @@ for riga in range(len(arrayanime)):
       os.chown(filename, -1, -1)  # Change owner to nobody:users
       
       scrivilogfile(
-          "Dimensione file scaricato " + str(os.path.getsize(filename)), 2)
+          "Dimensione file scaricato " + str(os.path.getsize(filename)), 2,'DEBUG',cyan)
 
       # Check if all parts were downloaded successfully
       if os.path.exists(filename) and os.path.getsize(filename) == file_size:
 
         arrayanime[riga][1] = int(arrayanime[riga][1]) + 1
         sanitizzariga(arrayanime[riga])
-        scrivilogfile(filename + " scaricato con successo", 1)
+        scrivilogfile(filename + " scaricato con successo", 1,'INFO',green)
         ripeti = 1
       else:
         scrivilogfile(
-            "ATTENZIONE: " + filename + " non scaricato correttamente", 1)
+            "ATTENZIONE: " + filename + " non scaricato correttamente", 1,'ERROR',red)
         ripeti = 0
     else:
-      scrivilogfile(url + " non trovato, errore " + str(response.status_code),
-                    1)
+      scrivilogfile(url + " non trovato, errore " + str(response.status_code),1,'ERROR',red)
       ripeti = 0
   salvarisultato(arrayanime, "./listaanime2.txt")
