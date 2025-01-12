@@ -75,7 +75,7 @@ def scrivilogfile(testo, loglv,typelog,colorlog):
   formatted_datetime = current_datetime.strftime("%Y-%m-%d %H:%M:%S")
   if loglv <= loglevel:
     with open('log.txt', 'a') as f:
-      f.write('[' + formatted_datetime + ']'+colorlog+'['+ typelog+']' + testo + '\n')
+      f.write('[' + formatted_datetime + ']'+colorlog+'['+ typelog+']' + reset + testo + '\n')
 
 
 def download_part(url, nome_file, start_byte, end_byte, i):
@@ -84,10 +84,10 @@ def download_part(url, nome_file, start_byte, end_byte, i):
   """
   response = download_file(url, nome_file, start_byte, end_byte, i)
   if response == 0:
-    scrivilogfile(f"Parte {start_byte}-{end_byte} scaricata con successo", 2,'INFO',green)
+    scrivilogfile(f"Parte {start_byte}-{end_byte} scaricata con successo", 2,'DEBUG',green)
   else:
     scrivilogfile(
-        f"Errore durante il download della parte {start_byte}-{end_byte}", 2,'ERROR',red)
+        f"Errore durante il download della parte {start_byte}-{end_byte}", 2,'DEBUG',red)
 
 
 def assemble_file(num_parts, output_file):
@@ -169,13 +169,13 @@ for riga in range(len(arrayanime)):
 
         arrayanime[riga][1] = int(arrayanime[riga][1]) + 1
         sanitizzariga(arrayanime[riga])
-        scrivilogfile(filename + " scaricato con successo", 1,'INFO',green)
+        scrivilogfile(filename + " scaricato con successo", 1,'OK',green)
         ripeti = 1
       else:
         scrivilogfile(
             "ATTENZIONE: " + filename + " non scaricato correttamente", 1,'ERROR',red)
         ripeti = 0
     else:
-      scrivilogfile(url + " non trovato, errore " + str(response.status_code),1,'ERROR',red)
+      scrivilogfile(url + " non trovato ",1,str(response.status_code),reset)
       ripeti = 0
   salvarisultato(arrayanime, "./listaanime2.txt")
