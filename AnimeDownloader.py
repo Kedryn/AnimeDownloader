@@ -75,7 +75,7 @@ def scrivilogfile(testo, loglv,typelog,colorlog):
   formatted_datetime = current_datetime.strftime("%Y-%m-%d %H:%M:%S")
   if loglv <= loglevel:
     with open('log.txt', 'a') as f:
-      f.write('[' + formatted_datetime + ']['+ typelog+']' + testo + '\n')
+      f.write('[' + formatted_datetime + ']'+colorlog+'['+ typelog+']' + testo + '\n')
 
 
 def download_part(url, nome_file, start_byte, end_byte, i):
