@@ -174,14 +174,9 @@ for riga in range(len(arrayanime)):
       if os.path.exists(filename) and os.path.getsize(filename) == file_size:
 
         arrayanime[riga][1] = int(arrayanime[riga][1]) + 1
-<<<<<<< HEAD
-        sanitizzariga(arrayanime[riga])
-        scrivilogfile(filename + " scaricato con successo", 1)
-        scrivilogscaricati(arrayanime[riga][4] + 'EP' + arrayanime[riga][1])
-=======
         sanitizzariga(arrayanime[riga])
         scrivilogfile(filename + " scaricato con successo", 1,'OK',green)
->>>>>>> 72b4a28c6a3f86f984ca83054a2b0ab207c28f7d
+        scrivilogscaricati(arrayanime[riga][4] + 'EP' + arrayanime[riga][1])
         ripeti = 1
       else:
         scrivilogfile(
