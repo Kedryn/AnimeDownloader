@@ -172,11 +172,11 @@ for riga in range(len(arrayanime)):
 
       # Check if all parts were downloaded successfully
       if os.path.exists(filename) and os.path.getsize(filename) == file_size:
-
+        scrivilogscaricati(arrayanime[riga][4] + ' - EP' + arrayanime[riga][1])
         arrayanime[riga][1] = int(arrayanime[riga][1]) + 1
         sanitizzariga(arrayanime[riga])
         scrivilogfile(filename + " scaricato con successo", 1,'OK',green)
-        scrivilogscaricati(arrayanime[riga][4] + 'EP' + arrayanime[riga][1])
+
         ripeti = 1
       else:
         scrivilogfile(
