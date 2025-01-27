@@ -165,13 +165,14 @@ for riga in range(len(arrayanime)):
         thread.join()
 
       assemble_file(num_parts, filename)
-      os.chown(filename, -1, -1)  # Change owner to nobody:users
+
       
       scrivilogfile(
           "Dimensione file scaricato " + str(os.path.getsize(filename)), 2,'DEBUG',cyan)
 
       # Check if all parts were downloaded successfully
       if os.path.exists(filename) and os.path.getsize(filename) == file_size:
+        os.chown(filename, 99, 100)  # Change owner to nobody:users        
         scrivilogscaricati(arrayanime[riga][4] + ' - EP' + arrayanime[riga][1])
         arrayanime[riga][1] = int(arrayanime[riga][1]) + 1
         sanitizzariga(arrayanime[riga])
