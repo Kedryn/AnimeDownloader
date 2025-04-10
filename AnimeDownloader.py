@@ -52,8 +52,13 @@ def sanitizzariga(rigaarrayanime):
   lunghezzacifre = len(rigaarrayanime[2])
   rigaarrayanime[1] = str(int(rigaarrayanime[1])).zfill(lunghezzacifre)
 
-  if not rigaarrayanime[3].endswith('/'):
-    rigaarrayanime[3] += '/'
+  if rigaarrayanime[3] == "":
+    rigaarrayanime[3] = "01"
+  lunghezzacifreseason = len(rigaarrayanime[3])
+  rigaarrayanime[3] = str(int(rigaarrayanime[3])).zfill(lunghezzacifreseason)
+
+  if not rigaarrayanime[4].endswith('/'):
+    rigaarrayanime[4] += '/'
   return rigaarrayanime
 
 def salvarisultato(arrayanime, filename):
@@ -95,6 +100,31 @@ def download_part(url, nome_file, start_byte, end_byte, i):
     scrivilogfile(
         f"Errore durante il download della parte {start_byte}-{end_byte}", 2,'DEBUG',red)
 
+def controlla_e_crea_cartella(arrayanime, riga, rootfolder):
+    """
+    Controlla se il valore di arrayanime[riga][2] è un numero, verifica l'esistenza
+    della cartella "Season XX" e, se non esiste, la crea.
+
+    Args:
+        arrayanime: Lista contenente i dati degli anime.
+        riga: Indice della riga da controllare.
+        rootfolder: Percorso della cartella radice.
+    """
+    try:
+        # Controlla se il valore è un numero
+        stagione = int(arrayanime[riga][2])
+        # Formatta il numero con almeno due cifre
+        stagione_formattata = f"Season {stagione:02d}"
+        # Percorso completo della cartella
+        percorso_cartella = os.path.join(rootfolder, stagione_formattata)
+        # Crea la cartella se non esiste
+        if not os.path.exists(percorso_cartella):
+            os.makedirs(percorso_cartella)
+            print(f"Cartella creata: {percorso_cartella}")
+        else:
+            print(f"Cartella già esistente: {percorso_cartella}")
+    except ValueError:
+        print(f"Il valore '{arrayanime[riga][2]}' non è un numero valido.")
 
 def assemble_file(num_parts, output_file):
   with open(output_file, 'wb') as output:
@@ -126,8 +156,13 @@ for riga in range(len(arrayanime)):
   if arrayanime[riga][1] > arrayanime[riga][2]:
     scrivilogfile(arrayanime[riga][4] + " ENDED", 1,'WARN',yellow)
 
-  ###DA FARE leggere lunghezza cifre da file conf
-  sanitizzariga(arrayanime[riga]) 
+  ###Salta righe remmate
+  if arrayanime[riga][0] == "":
+    scrivilogfile(arrayanime[riga], 1,'WARN',yellow)
+    ripeti = 0
+  else:
+    ###DA FARE leggere lunghezza cifre da file conf
+    sanitizzariga(arrayanime[riga]) 
 
   while ripeti == 1 and arrayanime[riga][1] <= arrayanime[riga][2]:
     url = arrayanime[riga][0].replace("*", arrayanime[riga][1])
@@ -141,7 +176,7 @@ for riga in range(len(arrayanime)):
 
     if response.status_code == 200:
       print(url)
-      filename = rootfolder + arrayanime[riga][3] + url.split("/")[-1]
+      filename = rootfolder + arrayanime[riga][4] + url.split("/")[-1]
       file_size = int(response.headers['Content-Length'])
       scrivilogfile("Dimensione file su server " + str(file_size), 2,'DEBUG',cyan)
       # Split file into 8 parts
@@ -173,7 +208,7 @@ for riga in range(len(arrayanime)):
       # Check if all parts were downloaded successfully
       if os.path.exists(filename) and os.path.getsize(filename) == file_size:
         os.chown(filename, 99, 100)  # Change owner to nobody:users        
-        scrivilogscaricati(arrayanime[riga][4] + ' - EP' + arrayanime[riga][1])
+        scrivilogscaricati(arrayanime[riga][5] + ' - EP' + arrayanime[riga][1])
         arrayanime[riga][1] = int(arrayanime[riga][1]) + 1
         sanitizzariga(arrayanime[riga])
         scrivilogfile(filename + " scaricato con successo", 1,'OK',green)
@@ -186,4 +221,4 @@ for riga in range(len(arrayanime)):
     else:
       scrivilogfile(url + " non trovato ",1,str(response.status_code),reset)
       ripeti = 0
-  salvarisultato(arrayanime, "./listaanime2.txt")
+  salvarisultato(arrayanime, filelistaanime)
