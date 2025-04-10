@@ -155,7 +155,7 @@ arrayanime = leggere_file(filelistaanime)
 for riga in range(len(arrayanime)):
   ripeti = 1
   if arrayanime[riga][1] > arrayanime[riga][2]:
-    scrivilogfile(arrayanime[riga][4] + " ENDED", 1,'WARN',yellow)
+    scrivilogfile(arrayanime[riga][5] + " ENDED", 1,'WARN',yellow)
 
   ###Salta righe remmate
   if arrayanime[riga][0] == "":
@@ -173,12 +173,12 @@ for riga in range(len(arrayanime)):
       print(f"HTTP error occurred: {http_err}")
     # Get file size
     except Exception as err:
-      scrivilogfile("Dominio inesistente, " + arrayanime[riga][4] + " SPOSTATO",1,'ERROR',red)
+      scrivilogfile("Dominio inesistente, " + arrayanime[riga][5] + " SPOSTATO",1,'ERROR',red)
 
     if response.status_code == 200:
       print(url)
       #filename = rootfolder + arrayanime[riga][4] + url.split("/")[-1]
-      filename = rootfolder + arrayanime[riga][0].replace("*", "S" + arrayanime[riga][3] + "E"+ arrayanime[riga][1]) + url.split("/")[-1]
+      filename = rootfolder + arrayanime[riga][4].replace("*", "S" + arrayanime[riga][3] + "E"+ arrayanime[riga][1])
       file_size = int(response.headers['Content-Length'])
       scrivilogfile("Dimensione file su server " + str(file_size), 2,'DEBUG',cyan)
       # Split file into 8 parts
@@ -198,10 +198,10 @@ for riga in range(len(arrayanime)):
         threads.append(thread)
         thread.start()
       # Wait for all threads to finish
-      for thread in threads:
-        thread.join()
-        if not thread.is_alive():
-            scrivilogfile(f"Errore nel thread {thread.name}", 1, 'ERROR', red)
+      #for thread in threads:
+      #  thread.join()
+      #  if not thread.is_alive():
+      #      scrivilogfile(f"Errore nel thread {thread.name}", 1, 'ERROR', red)
 
       assemble_file(num_parts, filename)
 
