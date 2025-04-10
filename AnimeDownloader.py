@@ -101,32 +101,6 @@ def download_part(url, nome_file, start_byte, end_byte, i):
     scrivilogfile(
         f"Errore durante il download della parte {start_byte}-{end_byte}", 2,'DEBUG',red)
 
-def controlla_e_crea_cartella(arrayanime, riga, rootfolder):
-    """
-    Controlla se il valore di arrayanime[riga][2] è un numero, verifica l'esistenza
-    della cartella "Season XX" e, se non esiste, la crea.
-
-    Args:
-        arrayanime: Lista contenente i dati degli anime.
-        riga: Indice della riga da controllare.
-        rootfolder: Percorso della cartella radice.
-    """
-    try:
-        # Controlla se il valore è un numero
-        stagione = int(arrayanime[riga][2])
-        # Formatta il numero con almeno due cifre
-        stagione_formattata = f"Season {stagione:02d}"
-        # Percorso completo della cartella
-        percorso_cartella = os.path.join(rootfolder, stagione_formattata)
-        # Crea la cartella se non esiste
-        if not os.path.exists(percorso_cartella):
-            os.makedirs(percorso_cartella)
-            print(f"Cartella creata: {percorso_cartella}")
-        else:
-            print(f"Cartella già esistente: {percorso_cartella}")
-    except ValueError:
-        print(f"Il valore '{arrayanime[riga][2]}' non è un numero valido.")
-
 def assemble_file(num_parts, output_file):
   with open(output_file, 'wb') as output:
     for i in range(num_parts):
