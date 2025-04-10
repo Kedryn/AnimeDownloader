@@ -178,7 +178,8 @@ for riga in range(len(arrayanime)):
     if response.status_code == 200:
       print(url)
       #filename = rootfolder + arrayanime[riga][4] + url.split("/")[-1]
-      filename = rootfolder + arrayanime[riga][4].replace("*", "S" + arrayanime[riga][3] + "E"+ arrayanime[riga][1])
+      filenamebase = arrayanime[riga][0].split("/")[-1]
+      filename = rootfolder + arrayanime[riga][4] +  filenamebase.replace("*", "S" + arrayanime[riga][3] + "E"+ arrayanime[riga][1])
       file_size = int(response.headers['Content-Length'])
       scrivilogfile("Dimensione file su server " + str(file_size), 2,'DEBUG',cyan)
       # Split file into 8 parts
