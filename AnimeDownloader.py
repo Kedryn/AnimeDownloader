@@ -158,7 +158,7 @@ for riga in range(len(arrayanime)):
 
   ###Salta righe remmate
   if arrayanime[riga][0] == "":
-    scrivilogfile(arrayanime[riga], 1,'WARN',yellow)
+    scrivilogfile(arrayanime[riga][5], 1,'WARN',yellow)
     ripeti = 0
   else:
     ###DA FARE leggere lunghezza cifre da file conf
