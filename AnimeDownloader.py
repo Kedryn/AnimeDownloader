@@ -198,8 +198,8 @@ for riga in range(len(arrayanime)):
         threads.append(thread)
         thread.start()
       # Wait for all threads to finish
-      #for thread in threads:
-      #  thread.join()
+      for thread in threads:
+        thread.join()
       #  if not thread.is_alive():
       #      scrivilogfile(f"Errore nel thread {thread.name}", 1, 'ERROR', red)
 
