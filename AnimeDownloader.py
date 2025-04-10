@@ -4,6 +4,7 @@ import requests
 import os
 from tqdm import tqdm
 import threading
+from colorama import Fore, Style
 
 
 def leggere_file(filename):
@@ -133,11 +134,11 @@ def assemble_file(num_parts, output_file):
         output.write(part.read())
       os.remove(f"part_{i}")
 
-green = '\033[92m'
-red = '\033[91m'
-cyan = '\033[96m'
-yellow = '\033[93m'
-reset = '\033[0m'
+green = Fore.GREEN
+red = Fore.RED
+cyan = Fore.CYAN
+yellow = Fore.YELLOW
+reset = Style.RESET_ALL
   
 
 filelistaanime = "./listaanime2.txt"
@@ -176,7 +177,8 @@ for riga in range(len(arrayanime)):
 
     if response.status_code == 200:
       print(url)
-      filename = rootfolder + arrayanime[riga][4] + url.split("/")[-1]
+      #filename = rootfolder + arrayanime[riga][4] + url.split("/")[-1]
+      filename = rootfolder + arrayanime[riga][0].replace("*", "S" + arrayanime[riga][3] + "E"+ arrayanime[riga][1]) + url.split("/")[-1]
       file_size = int(response.headers['Content-Length'])
       scrivilogfile("Dimensione file su server " + str(file_size), 2,'DEBUG',cyan)
       # Split file into 8 parts
@@ -198,6 +200,8 @@ for riga in range(len(arrayanime)):
       # Wait for all threads to finish
       for thread in threads:
         thread.join()
+        if not thread.is_alive():
+            scrivilogfile(f"Errore nel thread {thread.name}", 1, 'ERROR', red)
 
       assemble_file(num_parts, filename)
 
