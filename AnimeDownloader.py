@@ -5,6 +5,7 @@ import os
 from tqdm import tqdm
 import threading
 from colorama import Fore, Style
+import sys
 
 
 def leggere_file(filename):
@@ -25,7 +26,6 @@ def leggere_file(filename):
       array.append(valori)
   return array
 
-
 def download_file(url, nome_file, start_byte, end_byte, part_index):
   """
   Scarica un file da internet.
@@ -43,8 +43,6 @@ def download_file(url, nome_file, start_byte, end_byte, part_index):
     return 0
   else:
     return response.status_code
-
-
 
 def sanitizzariga(rigaarrayanime):
   """
@@ -70,7 +68,6 @@ def salvarisultato(arrayanime, filename):
   with open(filename, "w") as f:
     for riga in arrayanime:
       f.write('#'.join(riga) + '\n')
-
 
 def scrivilogfile(testo, loglv,typelog,colorlog):
   """
@@ -115,7 +112,10 @@ yellow = Fore.YELLOW
 reset = Style.RESET_ALL
   
 
-filelistaanime = "./listaanime2.txt"
+if len(sys.argv) > 1:
+  filelistaanime = sys.argv[1]
+else:
+  filelistaanime = "./listaanime2.txt"
 arrayanime = []
 num_parts = 8
 loglevel = 1  #1 info, 2 debug
@@ -156,46 +156,50 @@ for riga in range(len(arrayanime)):
       filename = rootfolder + arrayanime[riga][4] +  filenamebase.replace("*", "S" + arrayanime[riga][3] + "E"+ arrayanime[riga][1])
       file_size = int(response.headers['Content-Length'])
       scrivilogfile("Dimensione file su server " + str(file_size), 2,'DEBUG',cyan)
-      # Split file into 8 parts
-      part_size = file_size // num_parts
-      # Last part must contain spare bytes from division
-      last_part_size = part_size + file_size % num_parts
+      if not os.path.exists(filename):
+        # Split file into 8 parts
+        part_size = file_size // num_parts
+        # Last part must contain spare bytes from division
+        last_part_size = part_size + file_size % num_parts
 
-      threads = []
-      for i in range(num_parts):
-        start_byte = i * part_size
-        end_byte = (i + 1) * part_size - 1
-        if i == num_parts - 1:
-          end_byte = start_byte + last_part_size - 1
-        thread = threading.Thread(target=download_part,
-                                  args=(url, filename, start_byte, end_byte,
-                                        i))
-        threads.append(thread)
-        thread.start()
-      # Wait for all threads to finish
-      for thread in threads:
-        thread.join()
-      #  if not thread.is_alive():
-      #      scrivilogfile(f"Errore nel thread {thread.name}", 1, 'ERROR', red)
+        threads = []
+        for i in range(num_parts):
+          start_byte = i * part_size
+          end_byte = (i + 1) * part_size - 1
+          if i == num_parts - 1:
+            end_byte = start_byte + last_part_size - 1
+          thread = threading.Thread(target=download_part,
+                                    args=(url, filename, start_byte, end_byte,
+                                          i))
+          threads.append(thread)
+          thread.start()
+        # Wait for all threads to finish
+        for thread in threads:
+          thread.join()
+        #  if not thread.is_alive():
+        #      scrivilogfile(f"Errore nel thread {thread.name}", 1, 'ERROR', red)
 
-      assemble_file(num_parts, filename)
+        assemble_file(num_parts, filename)
 
-      
-      scrivilogfile(
-          "Dimensione file scaricato " + str(os.path.getsize(filename)), 2,'DEBUG',cyan)
-
-      # Check if all parts were downloaded successfully
-      if os.path.exists(filename) and os.path.getsize(filename) == file_size:
-        os.chown(filename, 99, 100)  # Change owner to nobody:users        
-        scrivilogscaricati(arrayanime[riga][5] + ' - EP' + arrayanime[riga][1])
-        arrayanime[riga][1] = int(arrayanime[riga][1]) + 1
-        sanitizzariga(arrayanime[riga])
-        scrivilogfile(filename + " scaricato con successo", 1,'OK',green)
-
-        ripeti = 1
-      else:
+        
         scrivilogfile(
-            "ATTENZIONE: " + filename + " non scaricato correttamente", 1,'ERROR',red)
+            "Dimensione file scaricato " + str(os.path.getsize(filename)), 2,'DEBUG',cyan)
+
+        # Check if all parts were downloaded successfully
+        if os.path.exists(filename) and os.path.getsize(filename) == file_size:
+          os.chown(filename, 99, 100)  # Change owner to nobody:users        
+          scrivilogscaricati(arrayanime[riga][5] + ' - EP' + arrayanime[riga][1])
+          arrayanime[riga][1] = int(arrayanime[riga][1]) + 1
+          sanitizzariga(arrayanime[riga])
+          scrivilogfile(filename + " scaricato con successo", 1,'OK',green)
+
+          ripeti = 1
+        else:
+          scrivilogfile(
+              "ATTENZIONE: " + filename + " non scaricato correttamente", 1,'ERROR',red)
+          ripeti = 0
+      else:
+        scrivilogfile(filename + " gia' presente, salto download", 1,'WARN',yellow)
         ripeti = 0
     else:
       scrivilogfile(url + " non trovato ",1,str(response.status_code),reset)
