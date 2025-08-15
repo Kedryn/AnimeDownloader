@@ -115,7 +115,7 @@ reset = Style.RESET_ALL
 if len(sys.argv) > 1:
   filelistaanime = sys.argv[1]
 else:
-  filelistaanime = "./listaanime2.txt"
+  filelistaanime = "./listaanime.txt"
 arrayanime = []
 num_parts = 8
 loglevel = 1  #1 info, 2 debug
