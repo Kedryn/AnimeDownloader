@@ -76,7 +76,7 @@ def scrivilogfile(testo, loglv,typelog,colorlog):
   
   current_datetime = datetime.datetime.now()
   formatted_datetime = current_datetime.strftime("%Y-%m-%d %H:%M:%S")
-  if logcolori = False:
+  if logcolori == False:
     colorlog = ""
     reset = ""
   
