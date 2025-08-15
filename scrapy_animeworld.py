@@ -113,7 +113,7 @@ def scrape_animeworld():
                 # Apre il file in modalità append e salva i dati
                 with open(csv_file_path, 'a', newline='', encoding='utf-8') as file:
                     # Ho cambiato l'ordine dei campi secondo la tua richiesta
-                    fieldnames = ['url_primo_episodio', 'primo_episodio', 'ultimo_episodio', 'titolo']
+                    fieldnames = ['url_primo_episodio', 'primo_episodio', 'ultimo_episodio','stagione_episodio', 'download_path','titolo']
                     # Usa '#' come delimitatore
                     writer = csv.DictWriter(file, fieldnames=fieldnames, delimiter='#')
                     writer.writerow({
@@ -121,7 +121,7 @@ def scrape_animeworld():
                         'primo_episodio': primo_episodio,
                         'ultimo_episodio': ultimo_episodio,
                         'stagione_episodio': '01',
-                        'download_path': anime_title
+                        'download_path': anime_title,
                         'titolo': anime_title
                     })
                 print(f"  Salvato: {anime_title}")
