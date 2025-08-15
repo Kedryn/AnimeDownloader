@@ -123,8 +123,10 @@ rootfolder = "/mnt/user/Storage/media/"
 
 if len(sys.argv) > 2:
   rootfolder = sys.argv[2]
+  creazionefolder = True
 else:
   rootfolder = "/mnt/user/Storage/media/"
+  creazionefolder = False
 
 if os.path.exists('log.txt'):
   os.remove('log.txt')
@@ -158,8 +160,20 @@ for riga in range(len(arrayanime)):
       print(url)
       #filename = rootfolder + arrayanime[riga][4] + url.split("/")[-1]
       filenamebase = arrayanime[riga][0].split("/")[-1]
+      filenamepath  = rootfolder + arrayanime[riga][4]
       filename = rootfolder + arrayanime[riga][4] +  filenamebase.replace("*", "S" + arrayanime[riga][3] + "E"+ arrayanime[riga][1])
       file_size = int(response.headers['Content-Length'])
+
+      if not os.path.exists(filenamepath):
+        if creazionefolder == True:
+          scrivilogfile("Cartella " + filenamepath + " non trovata, creazione in corso", 2,'DEBUG',cyan)
+          os.makedirs(filenamepath)
+          os.chown(filenamepath, 99, 100)          
+        else:
+          scrivilogfile("Cartella " + filenamepath + " non trovata, salto creazione", 2,'DEBUG',cyan)
+      else:
+        scrivilogfile("Cartella " + filenamepath + " trovata, salto creazione", 2,'DEBUG',cyan)
+
       scrivilogfile("Dimensione file su server " + str(file_size), 2,'DEBUG',cyan)
       if not os.path.exists(filename):
         # Split file into 8 parts
