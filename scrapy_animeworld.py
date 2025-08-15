@@ -120,6 +120,8 @@ def scrape_animeworld():
                         'url_primo_episodio': episode_url,
                         'primo_episodio': primo_episodio,
                         'ultimo_episodio': ultimo_episodio,
+                        'stagione_episodio': '01',
+                        'download_path': anime_title
                         'titolo': anime_title
                     })
                 print(f"  Salvato: {anime_title}")
