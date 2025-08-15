@@ -53,7 +53,7 @@ def scrape_animeworld():
     base_url = "https://www.animeworld.ac"
     csv_file_path = "anime_list.csv"
     page_number = 1
-    max_pages_to_scrape = 50  # Regola questo valore in base a quante pagine vuoi estrarre
+    max_pages_to_scrape = 300  # Regola questo valore in base a quante pagine vuoi estrarre
 
     print("Inizio dell'estrazione...")
 
