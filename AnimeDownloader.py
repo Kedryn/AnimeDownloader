@@ -76,6 +76,10 @@ def scrivilogfile(testo, loglv,typelog,colorlog):
   
   current_datetime = datetime.datetime.now()
   formatted_datetime = current_datetime.strftime("%Y-%m-%d %H:%M:%S")
+  if logcolori = False:
+    colorlog = ""
+    reset = ""
+  
   if loglv <= loglevel:
     with open('log.txt', 'a') as f:
       f.write('[' + formatted_datetime + ']'+colorlog+'['+ typelog+']' + reset + testo + '\n')
@@ -110,7 +114,11 @@ red = Fore.RED
 cyan = Fore.CYAN
 yellow = Fore.YELLOW
 reset = Style.RESET_ALL
-  
+# Creazione di una variabile per il colore del log
+# logcolori = True  # Set to True to enable colored logs, False to disable
+logcolori = False  
+
+# Main script execution starts here
 
 if len(sys.argv) > 1:
   filelistaanime = sys.argv[1]
@@ -121,6 +129,7 @@ num_parts = 8
 loglevel = 1  #1 info, 2 debug
 rootfolder = "/mnt/user/Storage/media/"
 
+# Check if the second argument is provided for root folder
 if len(sys.argv) > 2:
   rootfolder = sys.argv[2]
   creazionefolder = True
@@ -128,6 +137,7 @@ else:
   rootfolder = "/mnt/user/Storage/media/"
   creazionefolder = False
 
+# Check if the log file exists and remove it
 if os.path.exists('log.txt'):
   os.remove('log.txt')
 
