@@ -121,6 +121,11 @@ num_parts = 8
 loglevel = 1  #1 info, 2 debug
 rootfolder = "/mnt/user/Storage/media/"
 
+if len(sys.argv) > 2:
+  rootfolder = sys.argv[2]
+else:
+  rootfolder = "/mnt/user/Storage/media/"
+
 if os.path.exists('log.txt'):
   os.remove('log.txt')
 
