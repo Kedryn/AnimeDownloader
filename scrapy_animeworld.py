@@ -45,6 +45,12 @@ def get_episode_numbers(html_content):
         ultimo_episodio = all_episode_links[-1].get('data-episode-num', 'N/A')
         return primo_episodio, ultimo_episodio
 
+def sanitize_title(title):
+    """
+    Sostituisce i caratteri che non sono validi nei nomi dei percorsi con un trattino.
+    """
+    return title.replace('/', '-')
+
 def scrape_animeworld():
     """
     Estrae titoli di anime, numeri di episodio e l'URL del primo episodio da animeworld.ac.
@@ -83,6 +89,10 @@ def scrape_animeworld():
             anime_title = item.get('data-jtitle', '').strip()
             # Rimuovi i caratteri '#' dal titolo
             anime_title = anime_title.replace('#', '')
+            
+            # Sanitizza il titolo per usarlo come nome di percorso
+            download_path = sanitize_title(anime_title)
+
             anime_page_url = f"{base_url}{item['href']}"
             
             print(f"  Recupero dettagli per: {anime_title}")
@@ -106,7 +116,7 @@ def scrape_animeworld():
                 if match:
                     episode_num_from_url = match.group(1)
                     if episode_num_from_url == '01':
-                        # Sostituisci il numero 01 con * nell'URL e aggiorna il numero dell'episodio
+                        # Sostituisci il numero 01 con * nell'URL
                         episode_url = episode_url.replace(f'Ep_{episode_num_from_url}_SUB', 'Ep_*_SUB')
                         episode_url = episode_url.replace(f'Ep_{episode_num_from_url}_ITA', 'Ep_*_ITA')
                 
@@ -121,7 +131,7 @@ def scrape_animeworld():
                         'primo_episodio': primo_episodio,
                         'ultimo_episodio': ultimo_episodio,
                         'stagione_episodio': '01',
-                        'download_path': anime_title,
+                        'download_path': download_path,
                         'titolo': anime_title
                     })
                 print(f"  Salvato: {anime_title}")
