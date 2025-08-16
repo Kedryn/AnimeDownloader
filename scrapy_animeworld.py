@@ -83,8 +83,9 @@ def scrape_animeworld():
 
         list_soup = BeautifulSoup(list_html, 'html.parser')
         # Selettore aggiornato per i tag 'a' con classe 'name'
-        anime_items = list_soup.select('div.info a.name')
-        
+        #anime_items = list_soup.select('div.info a.name')
+        anime_items = list_soup.select('div.items a.name')
+
         print(f"Processo lista a pagina: {page_number}" )   
 
         if not anime_items:
