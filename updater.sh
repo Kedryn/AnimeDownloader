@@ -1,3 +1,10 @@
+mv updater.sh updater_old.sh
+curl -H 'Cache-Control: no-cache' https://raw.githubusercontent.com/Kedryn/AnimeDownloader/refs/heads/main/updater.sh --output scrapy_animeworld.py 
+chmod 755 updater.sh
+if ! cmp -s updater.sh updater_old.sh; then
+    echo "Aggiornamento updater effettuato"
+    exec ./updater.sh
+fi
 mv animedownloader.py animedownloader_old.py
 curl -H 'Cache-Control: no-cache' https://raw.githubusercontent.com/Kedryn/AnimeDownloader/refs/heads/main/animedownloader.py --output animedownloader.py 
 chmod 755 animedownloader.py
