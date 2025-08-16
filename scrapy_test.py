@@ -33,15 +33,13 @@ def get_episode_numbers(html_content):
     # Aggiornato il selettore per essere più preciso
     active_episode_links = soup.select('ul.episodes.range.active a')
     hidden_episode_links = soup.select('ul.episodes.range.hidden a')
-    primo_episodio = '01'
-    ultimo_episodio = '01'
 
-    if not active_episode_links:
-        return primo_episodio, ultimo_episodio
+    primo_episodio = active_episode_links[0].get('data-episode-num', '01')
+    if not hidden_episode_links:
+        ultimo_episodio = active_episode_links[-1].get('data-episode-num', '01')
     else:
-        primo_episodio = active_episode_links[0].get('data-episode-num', 'N/A')
-        ultimo_episodio = hidden_episode_links[-1].get('data-episode-num', 'N/A')
-        return primo_episodio, ultimo_episodio
+        ultimo_episodio = hidden_episode_links[-1].get('data-episode-num', '01')
+    return primo_episodio, ultimo_episodio
 
 if __name__ == "__main__":
     # URL di esempio per il test. Sostituisci questo URL con la pagina di un anime a tua scelta.
