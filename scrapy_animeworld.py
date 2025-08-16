@@ -39,7 +39,7 @@ def get_episode_numbers(html_content):
 
 
     primo_episodio = active_episode_links[0].get('data-episode-num', '01')
-    
+
     # Se non ci sono episodi nascosti, prendi l'ultimo episodio dalla lista attiva
     if not hidden_episode_links:
         ultimo_episodio = active_episode_links[-1].get('data-episode-num', '01')
@@ -138,7 +138,7 @@ def scrape_animeworld():
                         'download_path': download_path,
                         'titolo': anime_title
                     })
-                print(f"  Salvato: {anime_title}")
+                print(f"  Salvato: {anime_title} episodi {primo_episodio} - {ultimo_episodio} ")
             else:
                 print(f"  Link di download alternativo non trovato per {anime_title}")
 
