@@ -31,15 +31,16 @@ def get_episode_numbers(html_content):
     """
     soup = BeautifulSoup(html_content, 'html.parser')
     # Aggiornato il selettore per essere più preciso
-    all_episode_links = soup.select('ul.episodes.range.active a')
+    active_episode_links = soup.select('ul.episodes.range.active a')
+    hidden_episode_links = soup.select('ul.episodes.range.hidden a')
     primo_episodio = 'N/A'
     ultimo_episodio = 'N/A'
 
-    if not all_episode_links:
+    if not active_episode_links:
         return 'N/A', 'N/A'
     else:
-        primo_episodio = all_episode_links[0].get('data-episode-num', 'N/A')
-        ultimo_episodio = all_episode_links[-1].get('data-episode-num', 'N/A')
+        primo_episodio = active_episode_links[0].get('data-episode-num', 'N/A')
+        ultimo_episodio = hidden_episode_links[-1].get('data-episode-num', 'N/A')
         return primo_episodio, ultimo_episodio
 
 if __name__ == "__main__":
