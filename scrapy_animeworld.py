@@ -85,7 +85,7 @@ def scrape_animeworld():
         # Selettore aggiornato per i tag 'a' con classe 'name'
         anime_items = list_soup.select('div.info a.name')
         
-        print("Processo lista a pagina: " + page_number )   
+        print(f"Processo lista a pagina: {page_number}" )   
 
         if not anime_items:
             print("Nessun anime trovato in questa pagina. Probabile fine della lista.")
