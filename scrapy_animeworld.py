@@ -36,15 +36,17 @@ def get_episode_numbers(html_content):
     # Aggiornato il selettore per essere più preciso
     active_episode_links = soup.select('ul.episodes.range.active a')
     hidden_episode_links = soup.select('ul.episodes.range.hidden a')
+    primo_episodio = '-1'   # Inizializza con un valore di default
+    ultimo_episodio = '-1'  # Inizializza con un valore di default
 
-
-    primo_episodio = active_episode_links[0].get('data-episode-num', '01')
+    if  active_episode_links:
+        primo_episodio = active_episode_links[0].get('data-episode-num', '-1')
 
     # Se non ci sono episodi nascosti, prendi l'ultimo episodio dalla lista attiva
-    if not hidden_episode_links:
-        ultimo_episodio = active_episode_links[-1].get('data-episode-num', '01')
+    if hidden_episode_links:
+        ultimo_episodio = hidden_episode_links[-1].get('data-episode-num', '-1')
     else:
-        ultimo_episodio = hidden_episode_links[-1].get('data-episode-num', '01')
+        ultimo_episodio = active_episode_links[-1].get('data-episode-num', '-1')
     return primo_episodio, ultimo_episodio
 
 def sanitize_title(title):
@@ -102,49 +104,52 @@ def scrape_animeworld():
             print(f"  Recupero dettagli per: {anime_title}")
 
             anime_page_html = get_html_content(anime_page_url)
-            if not anime_page_html:
-                continue
-            
-            # Usa la funzione per ottenere il numero di episodi (utile per l'ultimo episodio)
-            primo_episodio, ultimo_episodio = get_episode_numbers(anime_page_html)
+            if anime_page_html:
 
-            # Trova il link del primo episodio usando il suo ID specifico
-            first_episode_link = BeautifulSoup(anime_page_html, 'html.parser').select_one('#alternativeDownloadLink')
+                # Usa la funzione per ottenere il numero di episodi (utile per l'ultimo episodio)
+                primo_episodio, ultimo_episodio = get_episode_numbers(anime_page_html)
+                if primo_episodio == '-1' or ultimo_episodio == '-1':
+                    print(f"  Episodi non trovati per {anime_title}, salto...")
+                else
+                    # Trova il link del primo episodio usando il suo ID specifico
+                    first_episode_link = BeautifulSoup(anime_page_html, 'html.parser').select_one('#alternativeDownloadLink')
 
-            if first_episode_link:
-                episode_url = first_episode_link['href']
-                
-                # Cerca il numero dell'episodio nel link usando le espressioni regolari per entrambi i casi SUB e ITA
-                match = re.search(r'Ep_(\d+)_(?:SUB|ITA)', episode_url)
+                    if first_episode_link:
+                        episode_url = first_episode_link['href']
+                        
+                        # Cerca il numero dell'episodio nel link usando le espressioni regolari per entrambi i casi SUB e ITA
+                        match = re.search(r'Ep_(\d+)_(?:SUB|ITA)', episode_url)
 
-                if match:
-                    episode_num_from_url = match.group(1)
-                    if episode_num_from_url in ['01', '001', '0001']:
-                        # Sostituisci il numero 01 con * nell'URL
-                        episode_url = episode_url.replace(f'Ep_{episode_num_from_url}_SUB', 'Ep_*_SUB')
-                        episode_url = episode_url.replace(f'Ep_{episode_num_from_url}_ITA', 'Ep_*_ITA')
-                
-                # Apre il file in modalità append e salva i dati
-                with open(csv_file_path, 'a', newline='', encoding='utf-8') as file:
-                    # Ho cambiato l'ordine dei campi secondo la tua richiesta
-                    fieldnames = ['url_primo_episodio', 'primo_episodio', 'ultimo_episodio','stagione_episodio', 'download_path','titolo']
-                    # Usa '#' come delimitatore
-                    writer = csv.DictWriter(file, fieldnames=fieldnames, delimiter='#')
-                    writer.writerow({
-                        'url_primo_episodio': episode_url,
-                        'primo_episodio': primo_episodio,
-                        'ultimo_episodio': ultimo_episodio,
-                        'stagione_episodio': '01',
-                        'download_path': download_path,
-                        'titolo': anime_title
-                    })
-                print(f"  Salvato: {anime_title} episodi {primo_episodio} - {ultimo_episodio} ")
+                        if match:
+                            episode_num_from_url = match.group(1)
+                            if episode_num_from_url in ['01', '001', '0001']:
+                                # Sostituisci il numero 01 con * nell'URL
+                                episode_url = episode_url.replace(f'Ep_{episode_num_from_url}_SUB', 'Ep_*_SUB')
+                                episode_url = episode_url.replace(f'Ep_{episode_num_from_url}_ITA', 'Ep_*_ITA')
+                        
+                        # Apre il file in modalità append e salva i dati
+                        with open(csv_file_path, 'a', newline='', encoding='utf-8') as file:
+                            # Ho cambiato l'ordine dei campi secondo la tua richiesta
+                            fieldnames = ['url_primo_episodio', 'primo_episodio', 'ultimo_episodio','stagione_episodio', 'download_path','titolo']
+                            # Usa '#' come delimitatore
+                            writer = csv.DictWriter(file, fieldnames=fieldnames, delimiter='#')
+                            writer.writerow({
+                                'url_primo_episodio': episode_url,
+                                'primo_episodio': primo_episodio,
+                                'ultimo_episodio': ultimo_episodio,
+                                'stagione_episodio': '01',
+                                'download_path': download_path,
+                                'titolo': anime_title
+                            })
+                        print(f"  Salvato: {anime_title} episodi {primo_episodio} - {ultimo_episodio} ")
+                    else:
+                        print(f"  Link di download alternativo non trovato per {anime_title}")
+
+                    # Aggiungi un piccolo ritardo per evitare di sovraccaricare il server
+                    time.sleep(1)
             else:
-                print(f"  Link di download alternativo non trovato per {anime_title}")
-
-            # Aggiungi un piccolo ritardo per evitare di sovraccaricare il server
-            time.sleep(1)
-        
+                print(f"  Impossibile recuperare la pagina dell'anime: {anime_title}")
+        # Incrementa il numero di pagina per la prossima iterazione 
         page_number += 1
 
     print(f"\nEstrazione completata! Dati salvati in '{csv_file_path}'.")
