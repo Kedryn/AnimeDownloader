@@ -39,14 +39,13 @@ def get_episode_numbers(html_content):
     primo_episodio = '-1'   # Inizializza con un valore di default
     ultimo_episodio = '-1'  # Inizializza con un valore di default
 
-    if  active_episode_links:
+    if active_episode_links:
         primo_episodio = active_episode_links[0].get('data-episode-num', '-1')
-
-    # Se non ci sono episodi nascosti, prendi l'ultimo episodio dalla lista attiva
+        ultimo_episodio = active_episode_links[-1].get('data-episode-num', '-1')
+    # Se non ci sono episodi nascosti, controllali
     if hidden_episode_links:
         ultimo_episodio = hidden_episode_links[-1].get('data-episode-num', '-1')
-    else:
-        ultimo_episodio = active_episode_links[-1].get('data-episode-num', '-1')
+          
     return primo_episodio, ultimo_episodio
 
 def sanitize_title(title):
@@ -85,6 +84,8 @@ def scrape_animeworld():
         list_soup = BeautifulSoup(list_html, 'html.parser')
         # Selettore aggiornato per i tag 'a' con classe 'name'
         anime_items = list_soup.select('div.info a.name')
+        
+        print("Processo lista a pagina: " + page_number )   
 
         if not anime_items:
             print("Nessun anime trovato in questa pagina. Probabile fine della lista.")
