@@ -54,7 +54,31 @@ def sanitize_title(title):
     """
     title = title.replace(':', '-')
     title = title.replace('/', '-')
+    title = title.replace('\'', '-')
+    title = title.replace('"', '-')
+    title = title.replace('’', '-')
+    title = title.replace('?', '')
     return title
+
+def load_anime_list(file_path):
+    """
+    Carica i dati da un file CSV in un dizionario, utilizzando '#' come delimitatore.
+    La chiave è il download_path sanitizzato.
+    Restituisce il dizionario caricato.
+    """
+    data = {}
+    if os.path.exists(file_path):
+        try:
+            with open(file_path, 'r', newline='', encoding='utf-8') as file:
+                reader = csv.DictReader(file, delimiter='#')
+                for row in reader:
+                    # Usa il download_path come chiave per una ricerca veloce
+                    data[row['download_path']] = row
+            print(f"Caricati {len(data)} anime esistenti dal file '{file_path}'.")
+        except Exception as e:
+            print(f"Errore durante il caricamento del file '{file_path}': {e}")
+            return {}
+    return data
 
 def scrape_animeworld():
     """
@@ -68,9 +92,8 @@ def scrape_animeworld():
 
     print("Inizio dell'estrazione...")
 
-    # Svuota il file all'inizio della procedura
-    with open(csv_file_path, 'w', newline='', encoding='utf-8') as file:
-        pass  # Lascia il file vuoto senza scrivere intestazioni
+    # Carica i dati esistenti dal file CSV in un array
+    existing_anime_data = load_anime_list(csv_file_path)
 
     while page_number <= max_pages_to_scrape:
         list_url = f"{base_url}/az-list?page={page_number}"
@@ -83,7 +106,6 @@ def scrape_animeworld():
 
         list_soup = BeautifulSoup(list_html, 'html.parser')
         # Selettore aggiornato per i tag 'a' con classe 'name'
-        #anime_items = list_soup.select('div.info a.name')
         anime_items = list_soup.select('div.items a.name')
 
         print(f"Processo lista a pagina: {page_number}" )   
@@ -100,6 +122,11 @@ def scrape_animeworld():
             
             # Sanitizza il titolo per usarlo come nome di percorso
             download_path = sanitize_title(anime_title)
+            
+            # Controlla se l'anime esiste già nel nostro dizionario in memoria
+            if download_path in existing_anime_data:
+                print(f"  Anime '{anime_title}' già esistente, salto...")
+                continue  # Salta al prossimo elemento nel ciclo
 
             anime_page_url = f"{base_url}{item['href']}"
             
@@ -129,32 +156,35 @@ def scrape_animeworld():
                                 episode_url = episode_url.replace(f'Ep_{episode_num_from_url}_SUB', 'Ep_*_SUB')
                                 episode_url = episode_url.replace(f'Ep_{episode_num_from_url}_ITA', 'Ep_*_ITA')
                         
-                        # Apre il file in modalità append e salva i dati
-                        with open(csv_file_path, 'a', newline='', encoding='utf-8') as file:
-                            # Ho cambiato l'ordine dei campi secondo la tua richiesta
-                            fieldnames = ['url_primo_episodio', 'primo_episodio', 'ultimo_episodio','stagione_episodio', 'download_path','titolo']
-                            # Usa '#' come delimitatore
-                            writer = csv.DictWriter(file, fieldnames=fieldnames, delimiter='#')
-                            writer.writerow({
-                                'url_primo_episodio': episode_url,
-                                'primo_episodio': primo_episodio,
-                                'ultimo_episodio': ultimo_episodio,
-                                'stagione_episodio': '01',
-                                'download_path': download_path,
-                                'titolo': anime_title
-                            })
-                        print(f"  Salvato: {anime_title} episodi {primo_episodio} - {ultimo_episodio} ")
+                        # Aggiungi il nuovo anime al dizionario in memoria
+                        existing_anime_data[download_path] = {
+                            'url_primo_episodio': episode_url,
+                            'primo_episodio': primo_episodio,
+                            'ultimo_episodio': ultimo_episodio,
+                            'stagione_episodio': '01',
+                            'download_path': download_path,
+                            'titolo': anime_title
+                        }
+                        print(f"  Aggiunto: {anime_title} episodi {primo_episodio} - {ultimo_episodio} ")
                     else:
                         print(f"  Link di download alternativo non trovato per {anime_title}")
 
                     # Aggiungi un piccolo ritardo per evitare di sovraccaricare il server
-                    time.sleep(1)
+                    #time.sleep(1)
             else:
                 print(f"  Impossibile recuperare la pagina dell'anime: {anime_title}")
         # Incrementa il numero di pagina per la prossima iterazione 
         page_number += 1
 
-    print(f"\nEstrazione completata! Dati salvati in '{csv_file_path}'.")
+    # Scrivi tutti i dati aggiornati nel file CSV
+    print(f"\nScrittura finale dei dati in '{csv_file_path}'...")
+    fieldnames = ['url_primo_episodio', 'primo_episodio', 'ultimo_episodio','stagione_episodio', 'download_path','titolo']
+    with open(csv_file_path, 'w', newline='', encoding='utf-8') as file:
+        writer = csv.DictWriter(file, fieldnames=fieldnames, delimiter='#')
+        for row in existing_anime_data.values():
+            writer.writerow(row)
+
+    print(f"\nEstrazione e salvataggio completati! Dati salvati in '{csv_file_path}'.")
 
 if __name__ == "__main__":
     scrape_animeworld()
