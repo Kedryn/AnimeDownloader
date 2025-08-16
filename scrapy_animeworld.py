@@ -49,7 +49,9 @@ def sanitize_title(title):
     """
     Sostituisce i caratteri che non sono validi nei nomi dei percorsi con un trattino.
     """
-    return title.replace('/', '-')
+    title = title.replace(':', '-')
+    title = title.replace('/', '-')
+    return title
 
 def scrape_animeworld():
     """
