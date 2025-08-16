@@ -230,6 +230,8 @@ for riga in range(len(arrayanime)):
       else:
         scrivilogfile(filename + " gia' presente, salto download", 1,'WARN',yellow)
         ripeti = 1
+        arrayanime[riga][1] = int(arrayanime[riga][1]) + 1
+        sanitizzariga(arrayanime[riga])
         salvarisultato(arrayanime, filelistaanime)
     else:
       scrivilogfile(url + " non trovato ",1,str(response.status_code),reset)
