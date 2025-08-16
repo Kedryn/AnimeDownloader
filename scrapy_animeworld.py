@@ -110,7 +110,7 @@ def scrape_animeworld():
                 primo_episodio, ultimo_episodio = get_episode_numbers(anime_page_html)
                 if primo_episodio == '-1' or ultimo_episodio == '-1':
                     print(f"  Episodi non trovati per {anime_title}, salto...")
-                else
+                else:
                     # Trova il link del primo episodio usando il suo ID specifico
                     first_episode_link = BeautifulSoup(anime_page_html, 'html.parser').select_one('#alternativeDownloadLink')
 
