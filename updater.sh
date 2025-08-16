@@ -1,5 +1,5 @@
 mv updater.sh updater_old.sh
-curl -H 'Cache-Control: no-cache' https://raw.githubusercontent.com/Kedryn/AnimeDownloader/refs/heads/main/updater.sh --output scrapy_animeworld.py 
+curl -H 'Cache-Control: no-cache' https://raw.githubusercontent.com/Kedryn/AnimeDownloader/refs/heads/main/updater.sh --output updater.sh 
 chmod 755 updater.sh
 if ! cmp -s updater.sh updater_old.sh; then
     echo "Aggiornamento updater effettuato"
