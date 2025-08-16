@@ -221,7 +221,7 @@ for riga in range(len(arrayanime)):
           arrayanime[riga][1] = int(arrayanime[riga][1]) + 1
           sanitizzariga(arrayanime[riga])
           scrivilogfile(filename + " scaricato con successo", 1,'OK',green)
-
+          salvarisultato(arrayanime, filelistaanime)
           ripeti = 1
         else:
           scrivilogfile(
@@ -229,7 +229,8 @@ for riga in range(len(arrayanime)):
           ripeti = 0
       else:
         scrivilogfile(filename + " gia' presente, salto download", 1,'WARN',yellow)
-        ripeti = 0
+        ripeti = 1
+        salvarisultato(arrayanime, filelistaanime)
     else:
       scrivilogfile(url + " non trovato ",1,str(response.status_code),reset)
       ripeti = 0
