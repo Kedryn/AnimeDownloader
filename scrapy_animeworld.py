@@ -117,7 +117,7 @@ def scrape_animeworld():
 
                 if match:
                     episode_num_from_url = match.group(1)
-                    if episode_num_from_url == '01':
+                    if episode_num_from_url in ['01', '001', '0001']:
                         # Sostituisci il numero 01 con * nell'URL
                         episode_url = episode_url.replace(f'Ep_{episode_num_from_url}_SUB', 'Ep_*_SUB')
                         episode_url = episode_url.replace(f'Ep_{episode_num_from_url}_ITA', 'Ep_*_ITA')

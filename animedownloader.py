@@ -177,7 +177,7 @@ for riga in range(len(arrayanime)):
       if not os.path.exists(filenamepath):
         if creazionefolder == True:
           scrivilogfile("Cartella " + filenamepath + " non trovata, creazione in corso", 2,'DEBUG',cyan)
-          os.makedirs(filenamepath)
+          os.makedirs(filenamepath, exist_ok=True)
           os.chown(filenamepath, 99, 100)          
         else:
           scrivilogfile("Cartella " + filenamepath + " non trovata, salto creazione", 2,'DEBUG',cyan)
