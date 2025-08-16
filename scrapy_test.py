@@ -33,11 +33,11 @@ def get_episode_numbers(html_content):
     # Aggiornato il selettore per essere più preciso
     active_episode_links = soup.select('ul.episodes.range.active a')
     hidden_episode_links = soup.select('ul.episodes.range.hidden a')
-    primo_episodio = 'N/A'
-    ultimo_episodio = 'N/A'
+    primo_episodio = '01'
+    ultimo_episodio = '01'
 
     if not active_episode_links:
-        return 'N/A', 'N/A'
+        return primo_episodio, ultimo_episodio
     else:
         primo_episodio = active_episode_links[0].get('data-episode-num', 'N/A')
         ultimo_episodio = hidden_episode_links[-1].get('data-episode-num', 'N/A')
