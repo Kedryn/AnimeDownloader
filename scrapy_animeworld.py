@@ -8,7 +8,7 @@ import re    # Importa il modulo per le espressioni regolari
 import sys   # Importa il modulo sys
 
 # Controlla se il parametro "Force" è presente nella riga di comando, indipendentemente dalla posizione
-if "Force" in sys.argv:
+if "force" in [arg.lower() for arg in sys.argv]:
   forza = True
   print("Forzatura dell'aggiornamento dei dati...")
 else:
