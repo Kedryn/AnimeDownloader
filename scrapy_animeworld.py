@@ -138,7 +138,9 @@ def scrape_animeworld():
             download_path = sanitize_title(anime_title)
             
             # Controlla se l'anime esiste già nel nostro dizionario in memoria
-            if download_path in existing_anime_data and forza == False:
+            is_existing = download_path in existing_anime_data
+
+            if is_existing and not forza:
                 print(f"  Anime '{anime_title}' già esistente, salto...")
                 continue  # Salta al prossimo elemento nel ciclo
 
@@ -150,36 +152,46 @@ def scrape_animeworld():
             if anime_page_html:
 
                 # Usa la funzione per ottenere il numero di episodi (utile per l'ultimo episodio)
-                primo_episodio, ultimo_episodio = get_episode_numbers(anime_page_html)
-                if primo_episodio == '-1' or ultimo_episodio == '-1':
+                primo_episodio_nuovo, ultimo_episodio_nuovo = get_episode_numbers(anime_page_html)
+                if primo_episodio_nuovo == '-1' or ultimo_episodio_nuovo == '-1':
                     print(f"  Episodi non trovati per {anime_title}, salto...")
                 else:
                     # Trova il link del primo episodio usando il suo ID specifico
                     first_episode_link = BeautifulSoup(anime_page_html, 'html.parser').select_one('#alternativeDownloadLink')
 
                     if first_episode_link:
-                        episode_url = first_episode_link['href']
+                        episode_url_nuovo = first_episode_link['href']
                         
                         # Cerca il numero dell'episodio nel link usando le espressioni regolari per entrambi i casi SUB e ITA
-                        match = re.search(r'Ep_(\d+)_(?:SUB|ITA)', episode_url)
+                        match = re.search(r'Ep_(\d+)_(?:SUB|ITA)', episode_url_nuovo)
 
                         if match:
                             episode_num_from_url = match.group(1)
                             if episode_num_from_url in ['01', '001', '0001']:
                                 # Sostituisci il numero 01 con * nell'URL
-                                episode_url = episode_url.replace(f'Ep_{episode_num_from_url}_SUB', 'Ep_*_SUB')
-                                episode_url = episode_url.replace(f'Ep_{episode_num_from_url}_ITA', 'Ep_*_ITA')
+                                episode_url_nuovo = episode_url_nuovo.replace(f'Ep_{episode_num_from_url}_SUB', 'Ep_*_SUB')
+                                episode_url_nuovo = episode_url_nuovo.replace(f'Ep_{episode_num_from_url}_ITA', 'Ep_*_ITA')
                         
-                        # Aggiungi il nuovo anime al dizionario in memoria
-                        existing_anime_data[download_path] = {
-                            'url_primo_episodio': episode_url,
-                            'primo_episodio': primo_episodio,
-                            'ultimo_episodio': ultimo_episodio,
+                        # Dati da aggiungere o aggiornare
+                        data_to_add = {
+                            'url_primo_episodio': episode_url_nuovo,
+                            'ultimo_episodio': ultimo_episodio_nuovo,
                             'stagione_episodio': '01',
                             'download_path': download_path,
                             'titolo': anime_title
                         }
-                        print(f"  Aggiunto: {anime_title} episodi {primo_episodio} - {ultimo_episodio} ")
+                        
+                        # Se l'anime esiste e forza = True, aggiorna i dati ma mantiene il primo episodio
+                        if is_existing and forza:
+                            data_to_add['primo_episodio'] = existing_anime_data[download_path]['primo_episodio']
+                            existing_anime_data[download_path] = data_to_add
+                            print(f"  Aggiornato: {anime_title} (mantenuto primo episodio esistente)")
+                        # Altrimenti, è un nuovo anime, quindi lo aggiunge completamente
+                        else:
+                            data_to_add['primo_episodio'] = primo_episodio_nuovo
+                            existing_anime_data[download_path] = data_to_add
+                            print(f"  Aggiunto: {anime_title} episodi {primo_episodio_nuovo} - {ultimo_episodio_nuovo}")
+
                     else:
                         print(f"  Link di download alternativo non trovato per {anime_title}")
 
