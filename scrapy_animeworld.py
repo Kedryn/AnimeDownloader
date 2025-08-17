@@ -7,7 +7,8 @@ import urllib3 # Importa la libreria urllib3 per disabilitare gli avvisi
 import re    # Importa il modulo per le espressioni regolari
 import sys   # Importa il modulo sys
 
-if len(sys.argv) > 1:
+# Controlla se il parametro "Force" è presente nella riga di comando, indipendentemente dalla posizione
+if "Force" in sys.argv:
   forza = True
   print("Forzatura dell'aggiornamento dei dati...")
 else:
