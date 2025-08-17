@@ -70,10 +70,15 @@ def load_anime_list(file_path):
     if os.path.exists(file_path):
         try:
             with open(file_path, 'r', newline='', encoding='utf-8') as file:
-                reader = csv.DictReader(file, delimiter='#')
+                reader = csv.reader(file, delimiter='#')
+                fieldnames = ['url_primo_episodio', 'primo_episodio', 'ultimo_episodio','stagione_episodio', 'download_path','titolo']
                 for row in reader:
-                    # Usa il download_path come chiave per una ricerca veloce
-                    data[row['download_path']] = row
+                    if len(row) == len(fieldnames):
+                        # Crea un dizionario per ogni riga, mappando i valori ai nomi dei campi
+                        row_dict = dict(zip(fieldnames, row))
+                        data[row_dict['download_path']] = row_dict
+                    else:
+                        print(f"Riga ignorata a causa di un numero di colonne non corrispondente: {row}")
             print(f"Caricati {len(data)} anime esistenti dal file '{file_path}'.")
         except Exception as e:
             print(f"Errore durante il caricamento del file '{file_path}': {e}")
