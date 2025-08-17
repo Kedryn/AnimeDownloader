@@ -5,6 +5,14 @@ import time
 import os
 import urllib3 # Importa la libreria urllib3 per disabilitare gli avvisi
 import re    # Importa il modulo per le espressioni regolari
+import sys   # Importa il modulo sys
+
+if len(sys.argv) > 1:
+  forza = True
+  print("Forzatura dell'aggiornamento dei dati...")
+else:
+  forza = False
+  
 
 # Disabilita esplicitamente l'avviso InsecureRequestWarning
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -129,7 +137,7 @@ def scrape_animeworld():
             download_path = sanitize_title(anime_title)
             
             # Controlla se l'anime esiste già nel nostro dizionario in memoria
-            if download_path in existing_anime_data:
+            if download_path in existing_anime_data and forza == False:
                 print(f"  Anime '{anime_title}' già esistente, salto...")
                 continue  # Salta al prossimo elemento nel ciclo
 
