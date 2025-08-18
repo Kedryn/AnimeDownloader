@@ -182,7 +182,7 @@ def scrape_animeworld():
                         episode_url_nuovo = first_episode_link['href']
                         
                         # Cerca il numero dell'episodio nel link usando le espressioni regolari per entrambi i casi SUB e ITA
-                        match = re.search(r'Ep_(\d+)_(?:SUB|ITA)', episode_url_nuovo)
+                        match = re.search(r'_(\d+)_(?:SUB|ITA)', episode_url_nuovo)
 
                         if match:
                             episode_num_from_url = match.group(1)
