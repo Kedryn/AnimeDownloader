@@ -38,7 +38,7 @@ def get_html_content(url):
 def get_episode_numbers(html_content):
     """
     Estrae il numero del primo e dell'ultimo episodio dal contenuto HTML della pagina dell'anime.
-    Restituisce una tupla (primo_episodio, ultimo_episodio).
+    Restituisce una tupla (primo_episodio, ultimo_episodio), assicurandosi che siano almeno di 2 cifre.
     """
     soup = BeautifulSoup(html_content, 'html.parser')
     # Aggiornato il selettore per essere più preciso
@@ -53,7 +53,13 @@ def get_episode_numbers(html_content):
     # Se non ci sono episodi nascosti, controllali
     if hidden_episode_links:
         ultimo_episodio = hidden_episode_links[-1].get('data-episode-num', '-1')
-        
+
+    # Assicura che siano almeno di 2 cifre (es: '1' -> '01')
+    if primo_episodio.isdigit():
+        primo_episodio = primo_episodio.zfill(2)
+    if ultimo_episodio.isdigit():
+        ultimo_episodio = ultimo_episodio.zfill(2)
+
     return primo_episodio, ultimo_episodio
 
 def sanitize_title(title):
