@@ -169,8 +169,8 @@ def scrape_animeworld():
                             episode_num_from_url = match.group(1)
                             if episode_num_from_url in ['01', '001', '0001']:
                                 # Sostituisci il numero 01 con * nell'URL
-                                episode_url_nuovo = episode_url_nuovo.replace(f'Ep_{episode_num_from_url}_SUB', 'Ep_*_SUB')
-                                episode_url_nuovo = episode_url_nuovo.replace(f'Ep_{episode_num_from_url}_ITA', 'Ep_*_ITA')
+                                episode_url_nuovo = episode_url_nuovo.replace(f'_{episode_num_from_url}_SUB', '_*_SUB')
+                                episode_url_nuovo = episode_url_nuovo.replace(f'_{episode_num_from_url}_ITA', '_*_ITA')
                         
                         # Dati da aggiungere o aggiornare
                         data_to_add = {
