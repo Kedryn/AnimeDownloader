@@ -14,7 +14,6 @@ if "force" in [arg.lower() for arg in sys.argv]:
 else:
   forza = False
   
-
 # Disabilita esplicitamente l'avviso InsecureRequestWarning
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -45,8 +44,8 @@ def get_episode_numbers(html_content):
     # Aggiornato il selettore per essere più preciso
     active_episode_links = soup.select('ul.episodes.range.active a')
     hidden_episode_links = soup.select('ul.episodes.range.hidden a')
-    primo_episodio = '-1'   # Inizializza con un valore di default
-    ultimo_episodio = '-1'  # Inizializza con un valore di default
+    primo_episodio = '-1'  # Inizializza con un valore di default
+    ultimo_episodio = '-1' # Inizializza con un valore di default
 
     if active_episode_links:
         primo_episodio = active_episode_links[0].get('data-episode-num', '-1')
@@ -54,7 +53,7 @@ def get_episode_numbers(html_content):
     # Se non ci sono episodi nascosti, controllali
     if hidden_episode_links:
         ultimo_episodio = hidden_episode_links[-1].get('data-episode-num', '-1')
-          
+        
     return primo_episodio, ultimo_episodio
 
 def sanitize_title(title):
@@ -101,14 +100,34 @@ def scrape_animeworld():
     """
     base_url = "https://www.animeworld.ac"
     csv_file_path = "anime_list.csv"
-    page_number = 1
-    max_pages_to_scrape = 300  # Regola questo valore in base a quante pagine vuoi estrarre
+    
+    # Aggiunto un blocco per recuperare il numero massimo di pagine dinamicamente
+    # Inizializza il numero massimo di pagine con un valore di fallback
+    max_pages_to_scrape = 300
+    
+    # URL per la pagina di lista principale
+    main_list_url = f"{base_url}/az-list"
+    print(f"Recupero il numero totale di pagine dalla pagina principale: {main_list_url}")
+    main_list_html = get_html_content(main_list_url)
+
+    if main_list_html:
+        # Cerca il valore della paginazione nel tag script
+        match = re.search(r'window\.paginationMaxPage\s*=\s*parseInt\("(\d+)"\);', main_list_html)
+        if match:
+            # Estrae il numero e lo converte in intero
+            max_pages_to_scrape = int(match.group(1))
+            print(f"Trovato il numero totale di pagine: {max_pages_to_scrape}")
+        else:
+            print(f"Valore di paginazione non trovato, uso il valore di fallback: {max_pages_to_scrape}")
+    else:
+        print(f"Impossibile recuperare la pagina principale, uso il valore di fallback: {max_pages_to_scrape}")
 
     print("Inizio dell'estrazione...")
 
     # Carica i dati esistenti dal file CSV in un array
     existing_anime_data = load_anime_list(csv_file_path)
 
+    page_number = 1
     while page_number <= max_pages_to_scrape:
         list_url = f"{base_url}/az-list?page={page_number}"
         print(f"Recupero la pagina della lista: {list_url}")
@@ -117,12 +136,12 @@ def scrape_animeworld():
         if not list_html:
             print("Impossibile recuperare la pagina, interruzione dell'estrazione.")
             break
-
+                
         list_soup = BeautifulSoup(list_html, 'html.parser')
         # Selettore aggiornato per i tag 'a' con classe 'name'
         anime_items = list_soup.select('div.items a.name')
 
-        print(f"Processo lista a pagina: {page_number}" )   
+        print(f"Processo lista a pagina: {page_number}" )  
 
         if not anime_items:
             print("Nessun anime trovato in questa pagina. Probabile fine della lista.")
