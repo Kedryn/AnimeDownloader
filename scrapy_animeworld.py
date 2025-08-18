@@ -41,20 +41,42 @@ def get_episode_numbers(html_content):
     Restituisce una tupla (primo_episodio, ultimo_episodio), assicurandosi che siano almeno di 2 cifre.
     """
     soup = BeautifulSoup(html_content, 'html.parser')
-    # Aggiornato il selettore per essere più preciso
-    active_episode_links = soup.select('ul.episodes.range.active a')
-    hidden_episode_links = soup.select('ul.episodes.range.hidden a')
-    primo_episodio = '-1'  # Inizializza con un valore di default
-    ultimo_episodio = '-1' # Inizializza con un valore di default
 
+    # Inizializza le variabili
+    primo_episodio = '-1'
+    ultimo_episodio = '-1'
+
+    # Estrae il numero del primo episodio dalla lista di episodi attivi
+    active_episode_links = soup.select('ul.episodes.range.active a')
     if active_episode_links:
         primo_episodio = active_episode_links[0].get('data-episode-num', '-1')
-        ultimo_episodio = active_episode_links[-1].get('data-episode-num', '-1')
-    # Se non ci sono episodi nascosti, controllali
-    if hidden_episode_links:
-        ultimo_episodio = hidden_episode_links[-1].get('data-episode-num', '-1')
 
-    # Assicura che siano almeno di 2 cifre (es: '1' -> '01')
+    # Estrae il numero dell'ultimo episodio dalla lista di episodi attivi
+    if ultimo_episodio == '-1':
+        hidden_episode_links = soup.select('ul.episodes.range.hidden a')
+        if hidden_episode_links:
+            ultimo_episodio = hidden_episode_links[-1].get('data-episode-num', '-1')
+        elif active_episode_links:
+            ultimo_episodio = active_episode_links[-1].get('data-episode-num', '-1')
+
+    # Cerca il tag <dt>Episodi:</dt> per una potenziale scorciatoia
+    episodes_dt_tag = soup.find('dt', string='Episodi:')
+    if episodes_dt_tag:
+        episodes_dd_tag = episodes_dt_tag.find_next_sibling('dd')
+        if episodes_dd_tag:
+            episodes_text = episodes_dd_tag.get_text(strip=True)
+            # Se il testo è un numero, usalo come ultimo episodio
+            if episodes_text.isdigit():
+                ultimo_episodio = episodes_text
+            # Se il testo è '??', definisci il valore massimo in base al primo episodio
+            elif episodes_text == '??':
+                # Calcola il valore massimo in base al numero di cifre del primo episodio
+                if ultimo_episodio.isdigit():
+                    ultimo_episodio = '9' * len(ultimo_episodio)
+                else:
+                    ultimo_episodio = '99' # Valore di fallback se il primo episodio non è un numero
+
+    # Assicura che i numeri siano almeno di 2 cifre (es: '1' -> '01')
     if primo_episodio.isdigit():
         primo_episodio = primo_episodio.zfill(2)
     if ultimo_episodio.isdigit():
@@ -109,7 +131,7 @@ def scrape_animeworld():
     
     # Aggiunto un blocco per recuperare il numero massimo di pagine dinamicamente
     # Inizializza il numero massimo di pagine con un valore di fallback
-    max_pages_to_scrape = 300
+    max_pages_to_scrape = 233
     
     # URL per la pagina di lista principale
     main_list_url = f"{base_url}/az-list"
@@ -188,14 +210,14 @@ def scrape_animeworld():
                         episode_url_nuovo = first_episode_link['href']
                         
                         # Cerca il numero dell'episodio nel link usando le espressioni regolari per entrambi i casi SUB e ITA
+                        # La regex è stata modificata per essere più generica
                         match = re.search(r'_(\d+)_(?:SUB|ITA)', episode_url_nuovo)
 
                         if match:
                             episode_num_from_url = match.group(1)
+                            # Se il numero dell'episodio è '01' (o simili), lo sostituisce con '*'
                             if episode_num_from_url in ['01', '001', '0001']:
-                                # Sostituisci il numero 01 con * nell'URL
-                                episode_url_nuovo = episode_url_nuovo.replace(f'_{episode_num_from_url}_SUB', '_*_SUB')
-                                episode_url_nuovo = episode_url_nuovo.replace(f'_{episode_num_from_url}_ITA', '_*_ITA')
+                                episode_url_nuovo = re.sub(r'Ep_\d+_(SUB|ITA)', 'Ep_*_\\1', episode_url_nuovo)
                         
                         # Dati da aggiungere o aggiornare
                         data_to_add = {
