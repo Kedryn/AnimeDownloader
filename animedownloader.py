@@ -175,7 +175,7 @@ for riga in range(len(arrayanime)):
     sanitizzariga(arrayanime[riga])
     
   # Stampa il contenuto della riga del file prima di ogni modifica.
-  print(f"Contenuto della riga del file {filelistaanime}: {arrayanime[riga][0]}")
+  #print(f"Contenuto della riga del file {filelistaanime}: {arrayanime[riga][0]}")
 
   while ripeti == 1 and arrayanime[riga][1] <= arrayanime[riga][2]:
     url = arrayanime[riga][0].replace("*", arrayanime[riga][1])
