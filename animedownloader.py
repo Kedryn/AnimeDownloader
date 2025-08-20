@@ -115,8 +115,8 @@ cyan = Fore.CYAN
 yellow = Fore.YELLOW
 reset = Style.RESET_ALL
 # Creazione di una variabile per il colore del log
-# logcolori = True  # Set to True to enable colored logs, False to disable
-logcolori = False  
+# logcolori = True   # Set to True to enable colored logs, False to disable
+logcolori = False   
 
 # Main script execution starts here
 
@@ -160,83 +160,84 @@ for riga in range(len(arrayanime)):
     url = arrayanime[riga][0].replace("*", arrayanime[riga][1])
     try:
       response = requests.head(url)
+      if response.status_code == 200:
+        print(url)
+        #filename = rootfolder + arrayanime[riga][4] + url.split("/")[-1]
+        filenamebase = arrayanime[riga][0].split("/")[-1]
+        filenamepath  = rootfolder + arrayanime[riga][4]
+        filename = rootfolder + arrayanime[riga][4] +  filenamebase.replace("*", "S" + arrayanime[riga][3] + "E"+ arrayanime[riga][1])
+        file_size = int(response.headers['Content-Length'])
+
+        if not os.path.exists(filenamepath):
+          if creazionefolder == True:
+            scrivilogfile("Cartella " + filenamepath + " non trovata, creazione in corso", 2,'DEBUG',cyan)
+            os.makedirs(filenamepath, exist_ok=True)
+            os.chown(filenamepath, 99, 100)           
+          else:
+            scrivilogfile("Cartella " + filenamepath + " non trovata, salto creazione", 2,'DEBUG',cyan)
+        else:
+          scrivilogfile("Cartella " + filenamepath + " trovata, salto creazione", 2,'DEBUG',cyan)
+
+        scrivilogfile("Dimensione file su server " + str(file_size), 2,'DEBUG',cyan)
+        if not os.path.exists(filename):
+          # Split file into 8 parts
+          part_size = file_size // num_parts
+          # Last part must contain spare bytes from division
+          last_part_size = part_size + file_size % num_parts
+
+          threads = []
+          for i in range(num_parts):
+            start_byte = i * part_size
+            end_byte = (i + 1) * part_size - 1
+            if i == num_parts - 1:
+              end_byte = start_byte + last_part_size - 1
+            thread = threading.Thread(target=download_part,
+                                     args=(url, filename, start_byte, end_byte,
+                                           i))
+            threads.append(thread)
+            thread.start()
+          # Wait for all threads to finish
+          for thread in threads:
+            thread.join()
+          #   if not thread.is_alive():
+          #      scrivilogfile(f"Errore nel thread {thread.name}", 1, 'ERROR', red)
+
+          assemble_file(num_parts, filename)
+
+          
+          scrivilogfile(
+              "Dimensione file scaricato " + str(os.path.getsize(filename)), 2,'DEBUG',cyan)
+
+          # Check if all parts were downloaded successfully
+          if os.path.exists(filename) and os.path.getsize(filename) == file_size:
+            os.chown(filename, 99, 100)   # Change owner to nobody:users        
+            scrivilogscaricati(arrayanime[riga][5] + ' - EP' + arrayanime[riga][1])
+            arrayanime[riga][1] = int(arrayanime[riga][1]) + 1
+            sanitizzariga(arrayanime[riga])
+            scrivilogfile(filename + " scaricato con successo", 1,'OK',green)
+
+            ripeti = 1
+          else:
+            scrivilogfile(
+                "ATTENZIONE: " + filename + " non scaricato correttamente", 1,'ERROR',red)
+            ripeti = 0
+        else:
+          scrivilogfile(filename + " gia' presente, salto download", 1,'WARN',yellow)
+          ripeti = 1
+          arrayanime[riga][1] = int(arrayanime[riga][1]) + 1
+
+      else:
+        scrivilogfile(url + " non trovato ",1,str(response.status_code),reset)
+        ripeti = 0
     except requests.exceptions.HTTPError as http_err:
       print(f"HTTP error occurred: {http_err}")
-    # Get file size
+      scrivilogfile(f"HTTP error occurred: {http_err}", 1, 'ERROR', red)
+      ripeti = 0
     except Exception as err:
+    print(f"HTTP error occurred: {http_err}")
       scrivilogfile("Dominio inesistente, " + arrayanime[riga][5] + " SPOSTATO",1,'ERROR',red)
-
-    if response.status_code == 200:
-      print(url)
-      #filename = rootfolder + arrayanime[riga][4] + url.split("/")[-1]
-      filenamebase = arrayanime[riga][0].split("/")[-1]
-      filenamepath  = rootfolder + arrayanime[riga][4]
-      filename = rootfolder + arrayanime[riga][4] +  filenamebase.replace("*", "S" + arrayanime[riga][3] + "E"+ arrayanime[riga][1])
-      file_size = int(response.headers['Content-Length'])
-
-      if not os.path.exists(filenamepath):
-        if creazionefolder == True:
-          scrivilogfile("Cartella " + filenamepath + " non trovata, creazione in corso", 2,'DEBUG',cyan)
-          os.makedirs(filenamepath, exist_ok=True)
-          os.chown(filenamepath, 99, 100)          
-        else:
-          scrivilogfile("Cartella " + filenamepath + " non trovata, salto creazione", 2,'DEBUG',cyan)
-      else:
-        scrivilogfile("Cartella " + filenamepath + " trovata, salto creazione", 2,'DEBUG',cyan)
-
-      scrivilogfile("Dimensione file su server " + str(file_size), 2,'DEBUG',cyan)
-      if not os.path.exists(filename):
-        # Split file into 8 parts
-        part_size = file_size // num_parts
-        # Last part must contain spare bytes from division
-        last_part_size = part_size + file_size % num_parts
-
-        threads = []
-        for i in range(num_parts):
-          start_byte = i * part_size
-          end_byte = (i + 1) * part_size - 1
-          if i == num_parts - 1:
-            end_byte = start_byte + last_part_size - 1
-          thread = threading.Thread(target=download_part,
-                                    args=(url, filename, start_byte, end_byte,
-                                          i))
-          threads.append(thread)
-          thread.start()
-        # Wait for all threads to finish
-        for thread in threads:
-          thread.join()
-        #  if not thread.is_alive():
-        #      scrivilogfile(f"Errore nel thread {thread.name}", 1, 'ERROR', red)
-
-        assemble_file(num_parts, filename)
-
-        
-        scrivilogfile(
-            "Dimensione file scaricato " + str(os.path.getsize(filename)), 2,'DEBUG',cyan)
-
-        # Check if all parts were downloaded successfully
-        if os.path.exists(filename) and os.path.getsize(filename) == file_size:
-          os.chown(filename, 99, 100)  # Change owner to nobody:users        
-          scrivilogscaricati(arrayanime[riga][5] + ' - EP' + arrayanime[riga][1])
-          arrayanime[riga][1] = int(arrayanime[riga][1]) + 1
-          sanitizzariga(arrayanime[riga])
-          scrivilogfile(filename + " scaricato con successo", 1,'OK',green)
-
-          ripeti = 1
-        else:
-          scrivilogfile(
-              "ATTENZIONE: " + filename + " non scaricato correttamente", 1,'ERROR',red)
-          ripeti = 0
-      else:
-        scrivilogfile(filename + " gia' presente, salto download", 1,'WARN',yellow)
-        ripeti = 1
-        arrayanime[riga][1] = int(arrayanime[riga][1]) + 1
-
-    else:
-      scrivilogfile(url + " non trovato ",1,str(response.status_code),reset)
       ripeti = 0
     #sanitizzariga(arrayanime[riga])
     #salvarisultato(arrayanime, filelistaanime + ".tmp"))
   salvarisultato(arrayanime, filelistaanime + ".tmp")
   os.replace(filelistaanime + ".tmp", filelistaanime)
-
