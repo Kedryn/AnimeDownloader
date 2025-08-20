@@ -234,7 +234,7 @@ for riga in range(len(arrayanime)):
       scrivilogfile(f"HTTP error occurred: {http_err}", 1, 'ERROR', red)
       ripeti = 0
     except Exception as err:
-      print(f"HTTP error occurred: {err}")
+
       scrivilogfile("Dominio inesistente, " + arrayanime[riga][5] + " SPOSTATO",1,'ERROR',red)
       ripeti = 0
     #sanitizzariga(arrayanime[riga])
