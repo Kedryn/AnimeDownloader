@@ -80,14 +80,14 @@ def scrivilogfile(testo, loglv, typelog, colorlog):
     reset = ""
 
   if loglv <= loglevel:
-    with open('log.txt', 'a') as f:
+    with open(logfile, 'a') as f:
       f.write('[' + formatted_datetime + ']' + colorlog + '[' + typelog + ']' + reset + testo + '\n')
 
 def scrivilogscaricati(testo):
   """
     scrive il testo nel file scaricati.txt
   """
-  with open('scaricati.txt', 'a') as f:
+  with open(downloaded_file, 'a') as f:
     f.write(testo + '\n')
 
 def download_part(url, nome_file, start_byte, end_byte, i):
@@ -132,6 +132,12 @@ reset = Style.RESET_ALL
 # Creazione di una variabile per il colore del log
 # logcolori = True   # Set to True to enable colored logs, False to disable
 logcolori = False
+logfile = "log.txt"
+downloaded_file = "scaricati.txt"
+num_parts = 8
+loglevel = 1  #1 info, 2 debug
+rootfolder = "/mnt/user/Storage/media/"
+
 
 # Main script execution starts here
 
@@ -140,9 +146,6 @@ if len(sys.argv) > 1:
 else:
   filelistaanime = "./listaanime.txt"
 arrayanime = []
-num_parts = 8
-loglevel = 1  #1 info, 2 debug
-rootfolder = "/mnt/user/Storage/media/"
 
 # Check if the second argument is provided for root folder
 if len(sys.argv) > 2:
@@ -153,8 +156,8 @@ else:
   creazionefolder = False
 
 # Check if the log file exists and remove it
-if os.path.exists('log.txt'):
-  os.remove('log.txt')
+if os.path.exists(logfile):
+  os.remove(logfile)
 
 arrayanime = leggere_file(filelistaanime)
 
@@ -172,7 +175,7 @@ for riga in range(len(arrayanime)):
     sanitizzariga(arrayanime[riga])
     
   # Stampa il contenuto della riga del file prima di ogni modifica.
-  print(f"Contenuto della riga del file listaanime.txt: {arrayanime[riga][0]}")
+  print(f"Contenuto della riga del file {filelistaanime}: {arrayanime[riga][0]}")
 
   while ripeti == 1 and arrayanime[riga][1] <= arrayanime[riga][2]:
     url = arrayanime[riga][0].replace("*", arrayanime[riga][1])
