@@ -135,7 +135,7 @@ logcolori = False
 logfile = "log.txt"
 downloaded_file = "scaricati.txt"
 num_parts = 8
-loglevel = 1  #1 info, 2 debug
+loglevel = 2  #1 info, 2 debug
 rootfolder = "/mnt/user/Storage/media/"
 
 
@@ -176,6 +176,7 @@ for riga in range(len(arrayanime)):
     
   # Stampa il contenuto della riga del file prima di ogni modifica.
   #print(f"Contenuto della riga del file {filelistaanime}: {arrayanime[riga][0]}")
+  scrivilogfile(arrayanime[riga][0], 2, 'INFO', cyan)
 
   while ripeti == 1 and arrayanime[riga][1] <= arrayanime[riga][2]:
     url = arrayanime[riga][0].replace("*", arrayanime[riga][1])
