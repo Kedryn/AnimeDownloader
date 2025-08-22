@@ -187,7 +187,7 @@ for riga in range(len(arrayanime)):
         raise requests.exceptions.HTTPError(response.status_code)
 
     except requests.exceptions.HTTPError as http_err:
-      scrivilogfile(f"HTTP error occurred: {http_err}", 1, 'ERROR', red)
+      scrivilogfile(f"Episodio non trovato: url", 1, 'INFO', cyan)
       ripeti = 0
       continue
     except Exception as err:
