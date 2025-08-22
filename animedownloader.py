@@ -180,7 +180,7 @@ for riga in range(len(arrayanime)):
 
   while ripeti == 1 and arrayanime[riga][1] <= arrayanime[riga][2]:
     url = arrayanime[riga][0].replace("*", arrayanime[riga][1])
-    scrivilogfile(url, 2, 'INFO', cyan)
+    scrivilogfile(f"File da scaricare: '{url}'", 2, 'INFO', cyan)
     try:
       response = requests.head(url)
       if response.status_code != 200:
