@@ -88,7 +88,7 @@ def scrivilogscaricati(testo):
     scrive il testo nel file scaricati.txt
   """
   with open(downloaded_file, 'a') as f:
-    f.write(testo + '\n')
+    f.write('[' + formatted_datetime + ']' + colorlog + '[' + typelog + ']' + reset + testo + '\n')
 
 def download_part(url, nome_file, start_byte, end_byte, i):
   """
