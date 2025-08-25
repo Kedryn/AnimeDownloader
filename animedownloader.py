@@ -179,9 +179,9 @@ for riga in range(len(arrayanime)):
   scrivilogfile(arrayanime[riga][0], 2, 'INFO', cyan)
 
   while ripeti == 1 and int(arrayanime[riga][1]) <= int(arrayanime[riga][2]): 
-    scrivilogfile(f"File da scaricare: '{arrayanime[riga][1]}' e {arrayanime[riga][2]}", 2, 'INFO', cyan)
+    scrivilogfile(f"Verifica episodio: {arrayanime[riga][1]} e {arrayanime[riga][2]}", 2, 'DEBUG', cyan)
     url = arrayanime[riga][0].replace("*", arrayanime[riga][1])
-    scrivilogfile(f"File da scaricare: '{url}'", 2, 'INFO', cyan)
+    scrivilogfile(f"File da scaricare: '{url}'", 2, 'DEBUG', cyan)
     try:
       response = requests.head(url)
       if response.status_code != 200:
@@ -271,6 +271,7 @@ for riga in range(len(arrayanime)):
       scrivilogfile(filename + " gia' presente, salto download", 1, 'WARN', yellow)
       ripeti = 1
       arrayanime[riga][1] = int(arrayanime[riga][1]) + 1
+      sanitizzariga(arrayanime[riga])
 
   salvarisultato(arrayanime, filelistaanime + ".tmp")
   os.replace(filelistaanime + ".tmp", filelistaanime)
