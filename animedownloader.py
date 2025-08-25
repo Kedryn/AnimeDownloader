@@ -138,7 +138,7 @@ logcolori = False
 logfile = "log.txt"
 downloaded_file = "scaricati.txt"
 num_parts = 8
-loglevel = 2  #1 info, 2 debug
+loglevel = 1  #1 info, 2 debug
 rootfolder = "/mnt/user/Storage/media/"
 
 
