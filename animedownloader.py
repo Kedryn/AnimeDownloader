@@ -89,11 +89,9 @@ def scrivilogscaricati(testo):
   """
   current_datetime = datetime.datetime.now()
   formatted_datetime = current_datetime.strftime("%Y-%m-%d %H:%M:%S")
-  if logcolori == False:
-    colorlog = ""
-    reset = ""
+
   with open(downloaded_file, 'a') as f:
-    f.write('[' + formatted_datetime + ']' + colorlog + '[' + typelog + ']' + reset + testo + '\n')
+    f.write('[' + formatted_datetime + ']' + testo + '\n')
 
 def download_part(url, nome_file, start_byte, end_byte, i):
   """
