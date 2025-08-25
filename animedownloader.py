@@ -178,7 +178,7 @@ for riga in range(len(arrayanime)):
   #print(f"Contenuto della riga del file {filelistaanime}: {arrayanime[riga][0]}")
   scrivilogfile(arrayanime[riga][0], 2, 'INFO', cyan)
 
-  while ripeti == 1 and arrayanime[riga][1] <= arrayanime[riga][2]:
+  while ripeti == 1 and int(arrayanime[riga][1]) <= int(arrayanime[riga][2]):
     url = arrayanime[riga][0].replace("*", arrayanime[riga][1])
     scrivilogfile(f"File da scaricare: '{url}'", 2, 'INFO', cyan)
     try:
