@@ -87,6 +87,11 @@ def scrivilogscaricati(testo):
   """
     scrive il testo nel file scaricati.txt
   """
+  current_datetime = datetime.datetime.now()
+  formatted_datetime = current_datetime.strftime("%Y-%m-%d %H:%M:%S")
+  if logcolori == False:
+    colorlog = ""
+    reset = ""
   with open(downloaded_file, 'a') as f:
     f.write('[' + formatted_datetime + ']' + colorlog + '[' + typelog + ']' + reset + testo + '\n')
 
