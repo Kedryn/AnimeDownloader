@@ -111,7 +111,7 @@ def load_anime_list(file_path):
                 fieldnames = ['url_primo_episodio', 'primo_episodio', 'ultimo_episodio','stagione_episodio', 'download_path','titolo','ultimoaggiornamento']
                 for row in reader:
                     # Se il numero di colonne è minore, aggiungi colonne vuote; se maggiore, tronca
-                    if len(row) < len(fieldnames):
+                    if len(row) <= len(fieldnames):
                         row += [''] * (len(fieldnames) - len(row))
                         # Crea un dizionario per ogni riga, mappando i valori ai nomi dei campi
                         row_dict = dict(zip(fieldnames, row))
