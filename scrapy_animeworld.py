@@ -298,18 +298,19 @@ def scrape_animeworld():
         page_number += 1
 
 
-    # Riordina existing_anime_data usando il campo 'ultimoaggiornamento' in ordine discendente
-    sorted_anime_data = sorted(
-        existing_anime_data.values(),
-        key=lambda x: x.get('ultimoaggiornamento', ''),
-        reverse=True
+    # Riordina existing_anime_data usando il campo 'ultimoaggiornamento' in ordine discendente e crea un nuovo dizionario ordinato
+    sorted_anime_data = dict(
+        sorted(
+            existing_anime_data.items(),
+            key=lambda x: x[1].get('ultimoaggiornamento', ''),
+            reverse=True
+        )
     )
-    existing_anime_data = sorted_anime_data
     log(f"\nScrittura finale dei dati in '{csv_file_path}'...", "info")
     fieldnames = ['url_primo_episodio', 'primo_episodio', 'ultimo_episodio','stagione_episodio', 'download_path','titolo','ultimoaggiornamento']
     with open(csv_file_path, 'w', newline='', encoding='utf-8') as file:
         writer = csv.DictWriter(file, fieldnames=fieldnames, delimiter='#')
-        for row in existing_anime_data.values():
+        for row in sorted_anime_data.values():
             writer.writerow(row)
 
     log(f"\nEstrazione e salvataggio completati! Dati salvati in '{csv_file_path}'.", "info")
