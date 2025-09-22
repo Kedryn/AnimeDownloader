@@ -131,7 +131,8 @@ logging.basicConfig(
     filename=log_file,
     filemode='a',
     format='%(asctime)s [%(levelname)s] %(message)s',
-    level=logging.WARNING # Imposta il livello di logging a WARNING
+     # Imposta il livello di logging a WARNING
+    level=logging.WARNING,
     force=True
 )
 
@@ -139,7 +140,7 @@ logging.basicConfig(
 def log(message, level="info"):
     print(message)
     if level == "info":
-        logging.info(message)
+        #logging.info(message)
     elif level == "warning":
         logging.warning(message)
     elif level == "error":
@@ -172,7 +173,6 @@ def scrape_animeworld():
         if match:
             # Estrae il numero e lo converte in intero
             max_pages_to_scrape = int(match.group(1))
-            max_pages_to_scrape = 5
             log(f"Trovato il numero totale di pagine: {max_pages_to_scrape}", "info")
         else:
             log(f"Valore di paginazione non trovato, uso il valore di fallback: {max_pages_to_scrape}", "warning")
