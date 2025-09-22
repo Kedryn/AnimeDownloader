@@ -140,7 +140,7 @@ logging.basicConfig(
 def log(message, level="info"):
     print(message)
     if level == "info":
-        #logging.info(message)
+        logging.info(message)
     elif level == "warning":
         logging.warning(message)
     elif level == "error":
