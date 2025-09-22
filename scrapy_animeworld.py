@@ -262,7 +262,7 @@ def scrape_animeworld():
 
     # Scrivi tutti i dati aggiornati nel file CSV
     print(f"\nScrittura finale dei dati in '{csv_file_path}'...")
-    fieldnames = ['url_primo_episodio', 'primo_episodio', 'ultimo_episodio','stagione_episodio', 'download_path','titolo']
+    fieldnames = ['url_primo_episodio', 'primo_episodio', 'ultimo_episodio','stagione_episodio', 'download_path','titolo','ultimoaggiornamento']
     with open(csv_file_path, 'w', newline='', encoding='utf-8') as file:
         writer = csv.DictWriter(file, fieldnames=fieldnames, delimiter='#')
         for row in existing_anime_data.values():
