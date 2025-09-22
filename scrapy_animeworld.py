@@ -242,11 +242,13 @@ def scrape_animeworld():
                         # Se l'anime esiste e forza = True, aggiorna i dati ma mantiene il primo episodio
                         if is_existing and forza:
                             data_to_add['primo_episodio'] = existing_anime_data[download_path]['primo_episodio']
+                            if ultimo_episodio_nuovo > existing_anime_data[download_path]['ultimo_episodio']:
+                                data_to_add['ultimoaggiornamento'] = time.strftime('%Y-%m-%d')
                             existing_anime_data[download_path] = data_to_add
                             print(f"  Aggiornato: {anime_title} (mantenuto primo episodio esistente)")
                         # Altrimenti, è un nuovo anime, quindi lo aggiunge completamente
                         else:
-                            
+                            data_to_add['ultimoaggiornamento'] = time.strftime('%Y-%m-%d')
                             data_to_add['primo_episodio'] = primo_episodio_nuovo
                             existing_anime_data[download_path] = data_to_add
                             print(f"  Aggiunto: {anime_title} episodi {primo_episodio_nuovo} - {ultimo_episodio_nuovo}")
