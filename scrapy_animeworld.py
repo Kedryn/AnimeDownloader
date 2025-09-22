@@ -131,7 +131,7 @@ logging.basicConfig(
     filename=log_file,
     filemode='a',
     format='%(asctime)s [%(levelname)s] %(message)s',
-    level=logging.WARNING
+    level=logging.WARNING # Imposta il livello di logging a WARNING
 )
 
 # Funzione di utilità per loggare anche su console
@@ -277,13 +277,13 @@ def scrape_animeworld():
                             if ultimo_episodio_nuovo > existing_anime_data[download_path]['ultimo_episodio']:
                                 data_to_add['ultimoaggiornamento'] = time.strftime('%Y-%m-%d')
                             existing_anime_data[download_path] = data_to_add
-                            log(f"  Aggiornato: {anime_title} (mantenuto primo episodio esistente)", "info")
+                            log(f"  Aggiornato: {anime_title} (mantenuto primo episodio esistente) {ultimoaggiornamento}", "info")
                         # Altrimenti, è un nuovo anime, quindi lo aggiunge completamente
                         else:
                             data_to_add['ultimoaggiornamento'] = time.strftime('%Y-%m-%d')
                             data_to_add['primo_episodio'] = primo_episodio_nuovo
                             existing_anime_data[download_path] = data_to_add
-                            log(f"  Aggiunto: {anime_title} episodi {primo_episodio_nuovo} - {ultimo_episodio_nuovo}", "info")
+                            log(f"  Aggiunto: {anime_title} episodi {primo_episodio_nuovo} - {ultimo_episodio_nuovo}  {ultimoaggiornamento}", "info")
 
                     else:
                         log(f"  Link di download alternativo non trovato per {anime_title}" , "warning")
