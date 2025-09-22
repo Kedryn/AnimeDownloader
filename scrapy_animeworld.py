@@ -127,6 +127,8 @@ def load_anime_list(file_path):
 
 # Configura il logging
 log_file = "scrapy_animeworld.log"
+if os.path.exists(log_file):
+    os.remove(log_file)
 logging.basicConfig(
     filename=log_file,
     filemode='a',
