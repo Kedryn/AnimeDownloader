@@ -132,6 +132,7 @@ logging.basicConfig(
     filemode='a',
     format='%(asctime)s [%(levelname)s] %(message)s',
     level=logging.WARNING # Imposta il livello di logging a WARNING
+    force=True
 )
 
 # Funzione di utilità per loggare anche su console
