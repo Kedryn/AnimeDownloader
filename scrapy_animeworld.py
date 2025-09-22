@@ -113,8 +113,6 @@ def load_anime_list(file_path):
                     # Se il numero di colonne è minore, aggiungi colonne vuote; se maggiore, tronca
                     if len(row) < len(fieldnames):
                         row += [''] * (len(fieldnames) - len(row))
-                    elif len(row) > len(fieldnames):
-                        row = row[:len(fieldnames)]
                         # Crea un dizionario per ogni riga, mappando i valori ai nomi dei campi
                         row_dict = dict(zip(fieldnames, row))
                         data[row_dict['download_path']] = row_dict
