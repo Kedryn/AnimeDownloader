@@ -103,6 +103,10 @@ def scrivilogscaricati(testo):
 
   with open(downloaded_file, 'a') as f:
     f.write('[' + formatted_datetime + ']' + testo + '\n')
+    try:
+      os.chmod(downloaded_file, 0o777)
+    except Exception as e:
+      pass
 
 def download_part(url, nome_file, start_byte, end_byte, i):
   """
