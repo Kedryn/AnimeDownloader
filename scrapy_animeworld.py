@@ -4,6 +4,7 @@ from bs4 import BeautifulSoup
 import csv
 import time
 import os
+import logging
 import urllib3 # Importa la libreria urllib3 per disabilitare gli avvisi
 import re    # Importa il modulo per le espressioni regolari
 import sys   # Importa il modulo sys
@@ -124,6 +125,29 @@ def load_anime_list(file_path):
             return {}
     return data
 
+# Configura il logging
+log_file = "scrapy_animeworld.log"
+logging.basicConfig(
+    filename=log_file,
+    filemode='a',
+    format='%(asctime)s [%(levelname)s] %(message)s',
+    level=logging.INFO
+)
+
+# Funzione di utilità per loggare anche su console
+def log(message, level="info"):
+    print(message)
+    if level == "info":
+        logging.info(message)
+    elif level == "warning":
+        logging.warning(message)
+    elif level == "error":
+        logging.error(message)
+    elif level == "debug":
+        logging.debug(message)
+    else:
+        logging.info(message)
+
 def scrape_animeworld():
     """
     Estrae titoli di anime, numeri di episodio e l'URL del primo episodio da animeworld.ac.
@@ -147,13 +171,13 @@ def scrape_animeworld():
         if match:
             # Estrae il numero e lo converte in intero
             max_pages_to_scrape = int(match.group(1))
-            print(f"Trovato il numero totale di pagine: {max_pages_to_scrape}")
+            log(f"Trovato il numero totale di pagine: {max_pages_to_scrape}", "info")
         else:
-            print(f"Valore di paginazione non trovato, uso il valore di fallback: {max_pages_to_scrape}")
+            log(f"Valore di paginazione non trovato, uso il valore di fallback: {max_pages_to_scrape}", "warning")
     else:
-        print(f"Impossibile recuperare la pagina principale, uso il valore di fallback: {max_pages_to_scrape}")
+        log(f"Impossibile recuperare la pagina principale, uso il valore di fallback: {max_pages_to_scrape}", "warning")
 
-    print("Inizio dell'estrazione...")
+    log("Inizio dell'estrazione...", "info")
 
     # Carica i dati esistenti dal file CSV in un array
     existing_anime_data = load_anime_list(csv_file_path)
@@ -168,21 +192,21 @@ def scrape_animeworld():
     page_number = 1
     while page_number <= max_pages_to_scrape:
         list_url = f"{base_url}/az-list?page={page_number}"
-        print(f"Recupero la pagina della lista: {list_url}")
+        log(f"Recupero la pagina della lista: {list_url}", "info")
         list_html = get_html_content(list_url)
 
         if not list_html:
-            print("Impossibile recuperare la pagina, interruzione dell'estrazione.")
+            log("Impossibile recuperare la pagina, interruzione dell'estrazione.", "error")
             break
                 
         list_soup = BeautifulSoup(list_html, 'html.parser')
         # Selettore aggiornato per i tag 'a' con classe 'name'
         anime_items = list_soup.select('div.items a.name')
 
-        print(f"Processo lista a pagina: {page_number}" )  
+        log(f"Processo lista a pagina: {page_number}", "info")  
 
         if not anime_items:
-            print("Nessun anime trovato in questa pagina. Probabile fine della lista.")
+            log("Nessun anime trovato in questa pagina. Probabile fine della lista.", "info")
             break
 
         for item in anime_items:
@@ -198,12 +222,12 @@ def scrape_animeworld():
             is_existing = download_path in existing_anime_data
 
             if is_existing and not forza:
-                print(f"  Anime '{anime_title}' già esistente, salto...")
+                log(f"  Anime '{anime_title}' già esistente, salto...", "info")
                 continue  # Salta al prossimo elemento nel ciclo
 
             anime_page_url = f"{base_url}{item['href']}"
             
-            print(f"  Recupero dettagli per: {anime_title}")
+            log(f"  Recupero dettagli per: {anime_title}", "info")
 
             anime_page_html = get_html_content(anime_page_url)
             if anime_page_html:
@@ -211,7 +235,7 @@ def scrape_animeworld():
                 # Usa la funzione per ottenere il numero di episodi (utile per l'ultimo episodio)
                 primo_episodio_nuovo, ultimo_episodio_nuovo = get_episode_numbers(anime_page_html)
                 if primo_episodio_nuovo == '-1' or ultimo_episodio_nuovo == '-1':
-                    print(f"  Episodi non trovati per {anime_title}, salto...")
+                    log(f"  Episodi non trovati per {anime_title}, salto...", "warning")
                 else:
                     # Trova il link del primo episodio usando il suo ID specifico
                     first_episode_link = BeautifulSoup(anime_page_html, 'html.parser').select_one('#alternativeDownloadLink')
@@ -252,34 +276,34 @@ def scrape_animeworld():
                             if ultimo_episodio_nuovo > existing_anime_data[download_path]['ultimo_episodio']:
                                 data_to_add['ultimoaggiornamento'] = time.strftime('%Y-%m-%d')
                             existing_anime_data[download_path] = data_to_add
-                            print(f"  Aggiornato: {anime_title} (mantenuto primo episodio esistente)")
+                            log(f"  Aggiornato: {anime_title} (mantenuto primo episodio esistente)", "info")
                         # Altrimenti, è un nuovo anime, quindi lo aggiunge completamente
                         else:
                             data_to_add['ultimoaggiornamento'] = time.strftime('%Y-%m-%d')
                             data_to_add['primo_episodio'] = primo_episodio_nuovo
                             existing_anime_data[download_path] = data_to_add
-                            print(f"  Aggiunto: {anime_title} episodi {primo_episodio_nuovo} - {ultimo_episodio_nuovo}")
+                            log(f"  Aggiunto: {anime_title} episodi {primo_episodio_nuovo} - {ultimo_episodio_nuovo}", "info")
 
                     else:
-                        print(f"  Link di download alternativo non trovato per {anime_title}")
+                        log(f"  Link di download alternativo non trovato per {anime_title}" , "warning")
 
                     # Aggiungi un piccolo ritardo per evitare di sovraccaricare il server
                     #time.sleep(1)
             else:
-                print(f"  Impossibile recuperare la pagina dell'anime: {anime_title}")
+                log(f"  Impossibile recuperare la pagina dell'anime: {anime_title}", "error")
         # Incrementa il numero di pagina per la prossima iterazione 
         page_number += 1
 
 
     # Scrivi tutti i dati aggiornati nel file CSV
-    print(f"\nScrittura finale dei dati in '{csv_file_path}'...")
+    log(f"\nScrittura finale dei dati in '{csv_file_path}'...", "info")
     fieldnames = ['url_primo_episodio', 'primo_episodio', 'ultimo_episodio','stagione_episodio', 'download_path','titolo','ultimoaggiornamento']
     with open(csv_file_path, 'w', newline='', encoding='utf-8') as file:
         writer = csv.DictWriter(file, fieldnames=fieldnames, delimiter='#')
         for row in existing_anime_data.values():
             writer.writerow(row)
 
-    print(f"\nEstrazione e salvataggio completati! Dati salvati in '{csv_file_path}'.")
+    log(f"\nEstrazione e salvataggio completati! Dati salvati in '{csv_file_path}'.", "info")
 
 if __name__ == "__main__":
     scrape_animeworld()
