@@ -256,10 +256,12 @@ def scrape_animeworld():
 
                         # Inizializza ultimoaggiornamento con un valore di default
                         ultimoaggiornamento = ""
-                        if existing_anime_data[download_path]['ultimoaggiornamento'] == "":
+                        if download_path in existing_anime_data and existing_anime_data[download_path]['ultimoaggiornamento'] == "":
                             ultimoaggiornamento = '1900-01-01'
-                        else:
+                        elif download_path in existing_anime_data:
                             ultimoaggiornamento = existing_anime_data[download_path]['ultimoaggiornamento']
+                        else:
+                            ultimoaggiornamento = ""
 
                         # Dati da aggiungere o aggiornare
                         data_to_add = {
