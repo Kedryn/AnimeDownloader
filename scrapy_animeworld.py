@@ -229,8 +229,12 @@ def scrape_animeworld():
                             if episode_num_from_url in ['01', '001', '0001']:
                                 episode_url_nuovo = re.sub(r'Ep_\d+_(SUB|ITA)', 'Ep_*_\\1', episode_url_nuovo)
 
+                        # Inizializza ultimoaggiornamento con un valore di default
+                        ultimoaggiornamento = ""
                         if existing_anime_data[download_path]['ultimoaggiornamento'] == "":
-                            ultimoaggiornamento = time.strftime('1900-01-01')
+                            ultimoaggiornamento = '1900-01-01'
+                        else:
+                            ultimoaggiornamento = existing_anime_data[download_path]['ultimoaggiornamento']
 
                         # Dati da aggiungere o aggiornare
                         data_to_add = {
