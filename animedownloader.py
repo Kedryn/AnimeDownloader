@@ -68,6 +68,11 @@ def salvarisultato(arrayanime, filename):
   with open(filename, "w") as f:
     for riga in arrayanime:
       f.write('#'.join(riga) + '\n')
+    try:
+      os.chmod(filename, 0o777)
+    except Exception as e:
+      pass
+
 
 def scrivilogfile(testo, loglv, typelog, colorlog):
   """
@@ -82,6 +87,12 @@ def scrivilogfile(testo, loglv, typelog, colorlog):
   if loglv <= loglevel:
     with open(logfile, 'a') as f:
       f.write('[' + formatted_datetime + ']' + colorlog + '[' + typelog + ']' + reset + testo + '\n')
+    # Imposta i permessi del file log.txt  (chmod 777)
+    try:
+      os.chmod(logfile, 0o777)
+    except Exception as e:
+      pass
+
 
 def scrivilogscaricati(testo):
   """
