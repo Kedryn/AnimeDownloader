@@ -1,3 +1,4 @@
+#!/usr/bin/python3
 import requests
 from bs4 import BeautifulSoup
 import csv
@@ -107,7 +108,7 @@ def load_anime_list(file_path):
         try:
             with open(file_path, 'r', newline='', encoding='utf-8') as file:
                 reader = csv.reader(file, delimiter='#')
-                fieldnames = ['url_primo_episodio', 'primo_episodio', 'ultimo_episodio','stagione_episodio', 'download_path','titolo']
+                fieldnames = ['url_primo_episodio', 'primo_episodio', 'ultimo_episodio','stagione_episodio', 'download_path','titolo','ultimoaggiornamento']
                 for row in reader:
                     if len(row) == len(fieldnames):
                         # Crea un dizionario per ogni riga, mappando i valori ai nomi dei campi
@@ -131,7 +132,7 @@ def scrape_animeworld():
     
     # Aggiunto un blocco per recuperare il numero massimo di pagine dinamicamente
     # Inizializza il numero massimo di pagine con un valore di fallback
-    max_pages_to_scrape = 233
+    max_pages_to_scrape = 500
     
     # URL per la pagina di lista principale
     main_list_url = f"{base_url}/az-list"
@@ -154,6 +155,13 @@ def scrape_animeworld():
 
     # Carica i dati esistenti dal file CSV in un array
     existing_anime_data = load_anime_list(csv_file_path)
+    # Assicura che ogni riga abbia 7 colonne (aggiunge una colonna vuota se necessario)
+    #for key, row in existing_anime_data.items():
+    #    if len(row) == 6:
+    #        # Aggiunge una colonna vuota chiamata 'ultimoaggiornamento' se mancante
+    #        # Imposta la data corrente nel campo 'ultimoaggiornamento'
+    #        row['ultimoaggiornamento'] = time.strftime('%Y-%m-%d')
+
 
     page_number = 1
     while page_number <= max_pages_to_scrape:
@@ -226,6 +234,7 @@ def scrape_animeworld():
                             'stagione_episodio': '01',
                             'download_path': download_path,
                             'titolo': anime_title
+                            'ultimoaggiornamento':   ultimoaggiornamento
                         }
                         
                         # Se l'anime esiste e forza = True, aggiorna i dati ma mantiene il primo episodio
@@ -235,6 +244,7 @@ def scrape_animeworld():
                             print(f"  Aggiornato: {anime_title} (mantenuto primo episodio esistente)")
                         # Altrimenti, è un nuovo anime, quindi lo aggiunge completamente
                         else:
+                            
                             data_to_add['primo_episodio'] = primo_episodio_nuovo
                             existing_anime_data[download_path] = data_to_add
                             print(f"  Aggiunto: {anime_title} episodi {primo_episodio_nuovo} - {ultimo_episodio_nuovo}")
@@ -248,6 +258,7 @@ def scrape_animeworld():
                 print(f"  Impossibile recuperare la pagina dell'anime: {anime_title}")
         # Incrementa il numero di pagina per la prossima iterazione 
         page_number += 1
+
 
     # Scrivi tutti i dati aggiornati nel file CSV
     print(f"\nScrittura finale dei dati in '{csv_file_path}'...")
