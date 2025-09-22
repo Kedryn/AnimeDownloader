@@ -233,7 +233,7 @@ def scrape_animeworld():
                             'ultimo_episodio': ultimo_episodio_nuovo,
                             'stagione_episodio': '01',
                             'download_path': download_path,
-                            'titolo': anime_title
+                            'titolo': anime_title,
                             'ultimoaggiornamento':   ultimoaggiornamento
                         }
                         
