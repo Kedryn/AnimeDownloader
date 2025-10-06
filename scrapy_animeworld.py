@@ -74,9 +74,13 @@ def get_episode_numbers(html_content):
             elif episodes_text == '??':
                 # Calcola il valore massimo in base al numero di cifre del primo episodio
                 if ultimo_episodio.isdigit():
-                    ultimo_episodio = '9' * len(ultimo_episodio)
+                    ultimo_episodio = '9' * len(primo_episodio)
                 else:
-                    ultimo_episodio = '99' # Valore di fallback se il primo episodio non è un numero
+                    # Se il primo episodio non è un numero, imposta un valore di fallback dinamico in base alla lunghezza attesa
+                    if primo_episodio.isdigit():
+                        ultimo_episodio = '9' * len(primo_episodio)
+                    else:
+                        ultimo_episodio = '99'  # Fallback predefinito se la lunghezza non è determinabile
 
     # Assicura che i numeri siano almeno di 2 cifre (es: '1' -> '01')
     if primo_episodio.isdigit():
@@ -254,7 +258,7 @@ def scrape_animeworld():
                         if match:
                             episode_num_from_url = match.group(1)
                             # Se il numero dell'episodio è '01' (o simili), lo sostituisce con '*'
-                            if episode_num_from_url in ['01', '001', '0001']:
+                            if episode_num_from_url in ['01', '001', '0001','00']:
                                 episode_url_nuovo = re.sub(r'Ep_\d+_(SUB|ITA)', 'Ep_*_\\1', episode_url_nuovo)
 
                         # Inizializza ultimoaggiornamento con un valore di default
