@@ -95,38 +95,47 @@ def pulisci_parti(num_parts, riga_idx):
 def get_content_length(url):
     """
     Tenta di ottenere la dimensione reale del file.
-    Prima prova HEAD; se il valore è assente/zero/inaffidabile,
-    apre una GET con Range=0-0 e legge Content-Range.
-    Ritorna (size, etag_or_None).
+    Prima prova HEAD; se il valore è assente/zero, prova GET con Range=0-0.
+    Ritorna (size, http_status, etag_or_None).
+    - size=0 con status!=200/206 → risorsa non disponibile (404, 403, ecc.)
+    - size=0 con status=200/206  → risorsa presente ma dimensione non rilevabile
     """
     headers_base = {'referer': "https://server56.streamingaw.online/"}
+    last_status = 0
 
     # Tentativo 1: HEAD
     try:
         r = requests.head(url, headers=headers_base, timeout=20)
+        last_status = r.status_code
+        etag = r.headers.get('ETag')
         if r.status_code == 200:
             cl = int(r.headers.get('Content-Length', 0))
-            etag = r.headers.get('ETag')
             if cl > 0:
-                return cl, etag
-    except Exception:
-        pass
+                return cl, 200, etag
+        elif r.status_code not in (301, 302, 206):
+            # 404, 403, 5xx, ecc. → inutile proseguire
+            return 0, r.status_code, None
+    except Exception as e:
+        scrivilogfile(f"HEAD fallita: {e}", 2, 'DEBUG', cyan)
 
     # Tentativo 2: GET con Range: bytes=0-0 → legge Content-Range: bytes 0-0/TOTAL
     try:
         r = requests.get(url, headers={**headers_base, 'Range': 'bytes=0-0'},
                          stream=True, timeout=20)
+        last_status = r.status_code
+        etag = r.headers.get('ETag')
         if r.status_code == 206:
             cr = r.headers.get('Content-Range', '')  # "bytes 0-0/12345678"
-            etag = r.headers.get('ETag')
             if '/' in cr:
                 total = int(cr.split('/')[-1])
                 if total > 0:
-                    return total, etag
-    except Exception:
-        pass
+                    return total, 206, etag
+        elif r.status_code != 200:
+            return 0, r.status_code, None
+    except Exception as e:
+        scrivilogfile(f"GET Range fallita: {e}", 2, 'DEBUG', cyan)
 
-    return 0, None
+    return 0, last_status, None
 
 # --- LOGICA DI DOWNLOAD ---
 
