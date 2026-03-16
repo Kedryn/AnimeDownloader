@@ -183,11 +183,36 @@ def download_part_with_retries(url, start_byte, end_byte, part_idx, riga_idx, re
 
     results[part_idx] = False
 
+def verifica_parti(num_parts, riga_idx, part_sizes):
+    """
+    Controlla che tutte le parti esistano su disco e abbiano la dimensione corretta.
+    Ritorna lista di indici mancanti/corrotti.
+    """
+    corrotte = []
+    for i in range(num_parts):
+        part_id = f"part_{riga_idx}_{i}"
+        expected = part_sizes[i]
+        if not os.path.exists(part_id):
+            scrivilogfile(f"Pre-assembly: parte {i} MANCANTE su disco.", 1, 'ERROR', red)
+            corrotte.append(i)
+        else:
+            actual = os.path.getsize(part_id)
+            if actual != expected:
+                scrivilogfile(
+                    f"Pre-assembly: parte {i} dimensione errata "
+                    f"(attesa={expected}, trovata={actual}).",
+                    1, 'ERROR', red
+                )
+                corrotte.append(i)
+    return corrotte
+
 def assemble_file(num_parts, riga_idx, output_file):
     """Unisce le parti e le cancella."""
     with open(output_file, 'wb') as output:
         for i in range(num_parts):
             part_id = f"part_{riga_idx}_{i}"
+            if not os.path.exists(part_id):
+                raise FileNotFoundError(f"Parte {i} mancante durante assembly: {part_id}")
             with open(part_id, 'rb') as part:
                 output.write(part.read())
             os.remove(part_id)
@@ -209,6 +234,13 @@ def esegui_download(url, file_size, filename, riga_idx):
     threads = []
     results = [False] * num_parts
 
+    # Calcola le dimensioni attese per ogni parte (usate nella verifica pre-assembly)
+    part_sizes = []
+    for i in range(num_parts):
+        start = i * part_size
+        end = (i + 1) * part_size - 1 if i < num_parts - 1 else file_size - 1
+        part_sizes.append(end - start + 1)
+
     for i in range(num_parts):
         start = i * part_size
         end = (i + 1) * part_size - 1 if i < num_parts - 1 else file_size - 1
@@ -227,8 +259,25 @@ def esegui_download(url, file_size, filename, riga_idx):
         pulisci_parti(num_parts, riga_idx)
         return False
 
+    # Verifica fisica pre-assembly: non fidarsi solo di results[]
+    corrotte = verifica_parti(num_parts, riga_idx, part_sizes)
+    if corrotte:
+        scrivilogfile(
+            f"Pre-assembly fallito: parti corrotte/mancanti = {corrotte}",
+            1, 'ERROR', red
+        )
+        pulisci_parti(num_parts, riga_idx)
+        return False
+
     # Assembly
-    assemble_file(num_parts, riga_idx, filename)
+    try:
+        assemble_file(num_parts, riga_idx, filename)
+    except FileNotFoundError as e:
+        scrivilogfile(f"Errore assembly: {e}", 1, 'ERROR', red)
+        pulisci_parti(num_parts, riga_idx)
+        if os.path.exists(filename):
+            os.remove(filename)
+        return False
 
     # Verifica dimensione finale
     if not os.path.exists(filename):
