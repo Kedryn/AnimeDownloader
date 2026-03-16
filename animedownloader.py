@@ -334,13 +334,19 @@ if __name__ == "__main__":
             scrivilogfile(f"Analisi URL: {url}", 2, 'DEBUG', cyan)
 
             # --- Recupero dimensione file (robusto) ---
-            file_size, etag = get_content_length(url)
+            file_size, http_status, etag = get_content_length(url)
 
             if file_size == 0:
-                scrivilogfile(
-                    f"Episodio {riga[1]}: impossibile determinare dimensione o non disponibile.",
-                    1, 'INFO', yellow
-                )
+                if http_status == 404:
+                    scrivilogfile(f"Episodio {riga[1]} non trovato (HTTP 404), fine serie.", 1, 'INFO', yellow)
+                elif http_status in (403, 401):
+                    scrivilogfile(f"Episodio {riga[1]}: accesso negato (HTTP {http_status}).", 1, 'WARN', yellow)
+                elif http_status >= 500:
+                    scrivilogfile(f"Episodio {riga[1]}: errore server (HTTP {http_status}), salto.", 1, 'ERROR', red)
+                elif http_status == 0:
+                    scrivilogfile(f"Episodio {riga[1]}: errore di connessione (nessuna risposta).", 1, 'ERROR', red)
+                else:
+                    scrivilogfile(f"Episodio {riga[1]}: dimensione non rilevabile (HTTP {http_status}).", 1, 'WARN', yellow)
                 ripeti = 0
                 continue
 
