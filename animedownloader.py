@@ -8,7 +8,6 @@ import sys
 import time
 import hashlib
 
-# Inizializza colorama per gestire i colori su terminali diversi
 init(autoreset=True)
 
 # --- CONFIGURAZIONE ---
@@ -25,10 +24,9 @@ num_parts = 8
 loglevel = 2  # 1: INFO, 2: DEBUG
 rootfolder = "/mnt/user/Storage/media/"
 
-# Quante volte ritentare l'intero download se il file finale è corrotto
 MAX_DOWNLOAD_RETRIES = 3
-# Secondi di attesa tra un retry completo e l'altro
 DOWNLOAD_RETRY_DELAY = 30
+LOCKFILE = "/tmp/animedownloader.lock"
 
 # --- FUNZIONI DI SERVIZIO ---
 
@@ -47,7 +45,6 @@ def scrivilogfile(testo, loglv, typelog, colorlog):
     current_datetime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     color = colorlog if logcolori else ""
     res = reset if logcolori else ""
-
     if loglv <= loglevel:
         msg = f"[{current_datetime}]{color}[{typelog}]{res} {testo}\n"
         with open(logfile, 'a') as f:
@@ -84,11 +81,51 @@ def salvarisultato(arrayanime, filename):
         pass
 
 def pulisci_parti(num_parts, riga_idx):
-    """Rimuove eventuali file parte rimasti su disco."""
     for i in range(num_parts):
         pid = f"part_{riga_idx}_{i}"
         if os.path.exists(pid):
             os.remove(pid)
+
+# --- LOCK ---
+
+def acquisisci_lock():
+    """
+    Crea il lockfile con il PID corrente.
+    Se esiste già, verifica se il processo è ancora attivo:
+    - Attivo       → esce con errore
+    - Non attivo   → lockfile stale, lo sovrascrive e continua
+    - PermissionError → processo di altro utente, considera attivo
+    """
+    if os.path.exists(LOCKFILE):
+        try:
+            with open(LOCKFILE, 'r') as f:
+                old_pid = int(f.read().strip())
+            os.kill(old_pid, 0)  # kill -0: controlla esistenza senza inviare segnali
+            print(f"ERRORE: script già in esecuzione (PID {old_pid}). Uscita.")
+            scrivilogfile(f"Avvio bloccato: istanza già attiva con PID {old_pid}.", 1, 'ERROR', red)
+            sys.exit(1)
+        except ValueError:
+            scrivilogfile("Lockfile corrotto (PID non valido), sovrascrivo.", 1, 'WARN', yellow)
+        except ProcessLookupError:
+            scrivilogfile(f"Lockfile stale (processo non più attivo), sovrascrivo.", 1, 'WARN', yellow)
+        except PermissionError:
+            print(f"ERRORE: script già in esecuzione (PID {old_pid}, utente diverso). Uscita.")
+            scrivilogfile(f"Avvio bloccato: PID {old_pid} attivo (altro utente).", 1, 'ERROR', red)
+            sys.exit(1)
+
+    with open(LOCKFILE, 'w') as f:
+        f.write(str(os.getpid()))
+    try:
+        os.chmod(LOCKFILE, 0o644)
+    except:
+        pass
+
+def rilascia_lock():
+    """Rimuove il lockfile. Chiamato sia a fine normale che in caso di eccezione."""
+    try:
+        os.remove(LOCKFILE)
+    except FileNotFoundError:
+        pass
 
 # --- RECUPERO CONTENT-LENGTH AFFIDABILE ---
 
@@ -113,7 +150,6 @@ def get_content_length(url):
             if cl > 0:
                 return cl, 200, etag
         elif r.status_code not in (301, 302, 206):
-            # 404, 403, 5xx, ecc. → inutile proseguire
             return 0, r.status_code, None
     except Exception as e:
         scrivilogfile(f"HEAD fallita: {e}", 2, 'DEBUG', cyan)
@@ -140,7 +176,6 @@ def get_content_length(url):
 # --- LOGICA DI DOWNLOAD ---
 
 def download_file_chunk(url, start_byte, end_byte, part_id):
-    """Scarica fisicamente il chunk di byte. Ritorna (success, bytes_written)."""
     headers = {
         'referer': "https://server56.streamingaw.online/",
         'Range': f'bytes={start_byte}-{end_byte}'
@@ -160,12 +195,10 @@ def download_file_chunk(url, start_byte, end_byte, part_id):
         return False, 0
 
 def download_part_with_retries(url, start_byte, end_byte, part_idx, riga_idx, results, retries=3, delay=15):
-    """Gestisce i tentativi per ogni singolo thread."""
     part_id = f"part_{riga_idx}_{part_idx}"
     expected_size = end_byte - start_byte + 1
 
     for attempt in range(retries):
-        # Rimuovi parte precedente eventualmente corrotta
         if os.path.exists(part_id):
             os.remove(part_id)
 
@@ -193,10 +226,6 @@ def download_part_with_retries(url, start_byte, end_byte, part_idx, riga_idx, re
     results[part_idx] = False
 
 def verifica_parti(num_parts, riga_idx, part_sizes):
-    """
-    Controlla che tutte le parti esistano su disco e abbiano la dimensione corretta.
-    Ritorna lista di indici mancanti/corrotti.
-    """
     corrotte = []
     for i in range(num_parts):
         part_id = f"part_{riga_idx}_{i}"
@@ -216,7 +245,6 @@ def verifica_parti(num_parts, riga_idx, part_sizes):
     return corrotte
 
 def assemble_file(num_parts, riga_idx, output_file):
-    """Unisce le parti e le cancella."""
     with open(output_file, 'wb') as output:
         for i in range(num_parts):
             part_id = f"part_{riga_idx}_{i}"
@@ -227,7 +255,6 @@ def assemble_file(num_parts, riga_idx, output_file):
             os.remove(part_id)
 
 def md5_file(filepath):
-    """Calcola MD5 del file (usato per debug/log)."""
     h = hashlib.md5()
     with open(filepath, 'rb') as f:
         for chunk in iter(lambda: f.read(65536), b''):
@@ -235,15 +262,10 @@ def md5_file(filepath):
     return h.hexdigest()
 
 def esegui_download(url, file_size, filename, riga_idx):
-    """
-    Esegue il download multithread e l'assembly.
-    Ritorna True se il file finale è integro, False altrimenti.
-    """
     part_size = file_size // num_parts
     threads = []
     results = [False] * num_parts
 
-    # Calcola le dimensioni attese per ogni parte (usate nella verifica pre-assembly)
     part_sizes = []
     for i in range(num_parts):
         start = i * part_size
@@ -268,17 +290,12 @@ def esegui_download(url, file_size, filename, riga_idx):
         pulisci_parti(num_parts, riga_idx)
         return False
 
-    # Verifica fisica pre-assembly: non fidarsi solo di results[]
     corrotte = verifica_parti(num_parts, riga_idx, part_sizes)
     if corrotte:
-        scrivilogfile(
-            f"Pre-assembly fallito: parti corrotte/mancanti = {corrotte}",
-            1, 'ERROR', red
-        )
+        scrivilogfile(f"Pre-assembly fallito: parti corrotte/mancanti = {corrotte}", 1, 'ERROR', red)
         pulisci_parti(num_parts, riga_idx)
         return False
 
-    # Assembly
     try:
         assemble_file(num_parts, riga_idx, filename)
     except FileNotFoundError as e:
@@ -288,7 +305,6 @@ def esegui_download(url, file_size, filename, riga_idx):
             os.remove(filename)
         return False
 
-    # Verifica dimensione finale
     if not os.path.exists(filename):
         scrivilogfile("Errore: file finale non creato.", 1, 'ERROR', red)
         return False
@@ -297,7 +313,7 @@ def esegui_download(url, file_size, filename, riga_idx):
     if actual_size != file_size:
         scrivilogfile(
             f"Errore integrità: atteso={file_size} byte, ottenuto={actual_size} byte. "
-            f"MD5 parziale: {md5_file(filename)}",
+            f"MD5: {md5_file(filename)}",
             1, 'ERROR', red
         )
         os.remove(filename)
@@ -315,117 +331,115 @@ if __name__ == "__main__":
     else:
         creazionefolder = False
 
-    if os.path.exists(logfile):
-        os.remove(logfile)
+    acquisisci_lock()
 
-    arrayanime = leggere_file(filelistaanime)
+    try:
+        if os.path.exists(logfile):
+            os.remove(logfile)
 
-    for riga_idx in range(len(arrayanime)):
-        riga = arrayanime[riga_idx]
-        if not riga[0] or riga[0].startswith("#"):
-            scrivilogfile(f"Salto: {riga[5] if len(riga) > 5 else riga_idx}", 1, 'INFO', yellow)
-            continue
+        arrayanime = leggere_file(filelistaanime)
 
-        sanitizzariga(riga)
-        ripeti = 1
-
-        while ripeti == 1 and int(riga[1]) <= int(riga[2]):
-            url = riga[0].replace("*", riga[1])
-            scrivilogfile(f"Analisi URL: {url}", 2, 'DEBUG', cyan)
-
-            # --- Recupero dimensione file (robusto) ---
-            file_size, http_status, etag = get_content_length(url)
-
-            if file_size == 0:
-                if http_status == 404:
-                    scrivilogfile(f"Episodio {riga[1]} non trovato (HTTP 404), fine serie.", 1, 'INFO', yellow)
-                elif http_status in (403, 401):
-                    scrivilogfile(f"Episodio {riga[1]}: accesso negato (HTTP {http_status}).", 1, 'WARN', yellow)
-                elif http_status >= 500:
-                    scrivilogfile(f"Episodio {riga[1]}: errore server (HTTP {http_status}), salto.", 1, 'ERROR', red)
-                elif http_status == 0:
-                    scrivilogfile(f"Episodio {riga[1]}: errore di connessione (nessuna risposta).", 1, 'ERROR', red)
-                else:
-                    scrivilogfile(f"Episodio {riga[1]}: dimensione non rilevabile (HTTP {http_status}).", 1, 'WARN', yellow)
-                ripeti = 0
+        for riga_idx in range(len(arrayanime)):
+            riga = arrayanime[riga_idx]
+            if not riga[0] or riga[0].startswith("#"):
+                scrivilogfile(f"Salto: {riga[5] if len(riga) > 5 else riga_idx}", 1, 'INFO', yellow)
                 continue
 
-            scrivilogfile(f"Dimensione rilevata: {file_size} byte (ETag: {etag})", 2, 'DEBUG', cyan)
+            sanitizzariga(riga)
+            ripeti = 1
 
-            # --- Percorsi ---
-            filenamebase = riga[0].split("/")[-1]
-            path_completo = os.path.join(rootfolder, riga[4])
-            filename = os.path.join(
-                path_completo,
-                filenamebase.replace("*", f"S{riga[3]}E{riga[1]}")
-            )
+            while ripeti == 1 and int(riga[1]) <= int(riga[2]):
+                url = riga[0].replace("*", riga[1])
+                scrivilogfile(f"Analisi URL: {url}", 2, 'DEBUG', cyan)
 
-            if not os.path.exists(path_completo):
-                if creazionefolder:
-                    os.makedirs(path_completo, exist_ok=True)
-                    try:
-                        os.chown(path_completo, 99, 100)
-                    except:
-                        pass
-                else:
-                    scrivilogfile(f"Cartella {path_completo} mancante, salto.", 1, 'WARN', yellow)
+                file_size, http_status, etag = get_content_length(url)
+
+                if file_size == 0:
+                    if http_status == 404:
+                        scrivilogfile(f"Episodio {riga[1]} non trovato (HTTP 404), fine serie.", 1, 'INFO', yellow)
+                    elif http_status in (403, 401):
+                        scrivilogfile(f"Episodio {riga[1]}: accesso negato (HTTP {http_status}).", 1, 'WARN', yellow)
+                    elif http_status >= 500:
+                        scrivilogfile(f"Episodio {riga[1]}: errore server (HTTP {http_status}), salto.", 1, 'ERROR', red)
+                    elif http_status == 0:
+                        scrivilogfile(f"Episodio {riga[1]}: errore di connessione (nessuna risposta).", 1, 'ERROR', red)
+                    else:
+                        scrivilogfile(f"Episodio {riga[1]}: dimensione non rilevabile (HTTP {http_status}).", 1, 'WARN', yellow)
                     ripeti = 0
                     continue
 
-            # --- File già presente: verifica integrità ---
-            if os.path.exists(filename):
-                existing_size = os.path.getsize(filename)
-                if existing_size == file_size:
-                    scrivilogfile(f"{filename} esiste già ed è integro, salto.", 1, 'INFO', yellow)
+                scrivilogfile(f"Dimensione rilevata: {file_size} byte (ETag: {etag})", 2, 'DEBUG', cyan)
+
+                filenamebase = riga[0].split("/")[-1]
+                path_completo = os.path.join(rootfolder, riga[4])
+                filename = os.path.join(
+                    path_completo,
+                    filenamebase.replace("*", f"S{riga[3]}E{riga[1]}")
+                )
+
+                if not os.path.exists(path_completo):
+                    if creazionefolder:
+                        os.makedirs(path_completo, exist_ok=True)
+                        try:
+                            os.chown(path_completo, 99, 100)
+                        except:
+                            pass
+                    else:
+                        scrivilogfile(f"Cartella {path_completo} mancante, salto.", 1, 'WARN', yellow)
+                        ripeti = 0
+                        continue
+
+                if os.path.exists(filename):
+                    existing_size = os.path.getsize(filename)
+                    if existing_size == file_size:
+                        scrivilogfile(f"{filename} esiste già ed è integro, salto.", 1, 'INFO', yellow)
+                        riga[1] = str(int(riga[1]) + 1)
+                        sanitizzariga(riga)
+                        continue
+                    else:
+                        scrivilogfile(
+                            f"{filename} esiste ma è corrotto "
+                            f"(atteso={file_size}, trovato={existing_size}). Riscarico.",
+                            1, 'WARN', yellow
+                        )
+                        os.remove(filename)
+
+                scrivilogfile(f"Download iniziato: {filename} ({file_size} byte)", 1, 'INFO', green)
+
+                download_ok = False
+                for tentativo_globale in range(1, MAX_DOWNLOAD_RETRIES + 1):
+                    if tentativo_globale > 1:
+                        scrivilogfile(
+                            f"Retry download completo {tentativo_globale}/{MAX_DOWNLOAD_RETRIES} "
+                            f"tra {DOWNLOAD_RETRY_DELAY}s...",
+                            1, 'WARN', yellow
+                        )
+                        time.sleep(DOWNLOAD_RETRY_DELAY)
+
+                    download_ok = esegui_download(url, file_size, filename, riga_idx)
+                    if download_ok:
+                        break
+
+                if download_ok:
+                    try:
+                        os.chown(filename, 99, 100)
+                    except:
+                        pass
+                    scrivilogscaricati(f"{riga[5] if len(riga) > 5 else filename} - S{riga[3]}E{riga[1]}")
+                    scrivilogfile(f"Completato: {filename}", 1, 'OK', green)
                     riga[1] = str(int(riga[1]) + 1)
                     sanitizzariga(riga)
-                    continue
                 else:
                     scrivilogfile(
-                        f"{filename} esiste ma è corrotto "
-                        f"(atteso={file_size}, trovato={existing_size}). Riscarico.",
-                        1, 'WARN', yellow
+                        f"Download definitivamente fallito dopo {MAX_DOWNLOAD_RETRIES} tentativi: {filename}",
+                        1, 'ERROR', red
                     )
-                    os.remove(filename)
+                    ripeti = 0
 
-            # --- Download con retry completo ---
-            scrivilogfile(
-                f"Download iniziato: {filename} ({file_size} byte)",
-                1, 'INFO', green
-            )
+                salvarisultato(arrayanime, filelistaanime + ".tmp")
+                os.replace(filelistaanime + ".tmp", filelistaanime)
 
-            download_ok = False
-            for tentativo_globale in range(1, MAX_DOWNLOAD_RETRIES + 1):
-                if tentativo_globale > 1:
-                    scrivilogfile(
-                        f"Retry download completo {tentativo_globale}/{MAX_DOWNLOAD_RETRIES} "
-                        f"tra {DOWNLOAD_RETRY_DELAY}s...",
-                        1, 'WARN', yellow
-                    )
-                    time.sleep(DOWNLOAD_RETRY_DELAY)
+        scrivilogfile("Processo terminato.", 1, 'INFO', cyan)
 
-                download_ok = esegui_download(url, file_size, filename, riga_idx)
-                if download_ok:
-                    break
-
-            if download_ok:
-                try:
-                    os.chown(filename, 99, 100)
-                except:
-                    pass
-                scrivilogscaricati(f"{riga[5] if len(riga) > 5 else filename} - S{riga[3]}E{riga[1]}")
-                scrivilogfile(f"Completato: {filename}", 1, 'OK', green)
-                riga[1] = str(int(riga[1]) + 1)
-                sanitizzariga(riga)
-            else:
-                scrivilogfile(
-                    f"Download definitivamente fallito dopo {MAX_DOWNLOAD_RETRIES} tentativi: {filename}",
-                    1, 'ERROR', red
-                )
-                ripeti = 0
-
-            # Salva progresso
-            salvarisultato(arrayanime, filelistaanime + ".tmp")
-            os.replace(filelistaanime + ".tmp", filelistaanime)
-
-    scrivilogfile("Processo terminato.", 1, 'INFO', cyan)
+    finally:
+        rilascia_lock()
