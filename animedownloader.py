@@ -186,7 +186,7 @@ def esegui_download(url, file_size, filename, riga_idx):
                 with open(p_id, 'rb') as p: out.write(p.read())
                 os.remove(p_id)
         return True
-    pulicci_parti(num_parts, riga_idx)
+    pulisci_parti(num_parts, riga_idx)
     return False
 
 # --- MAIN ---
