@@ -27,14 +27,18 @@ session = requests.Session()
 
 def esegui_login(base_url):
     """
-    Effettua il login usando l'username e gestendo il token CSRF.
+    Effettua il login usando l'username mappato sul campo 'email' richiesto dal form,
+    gestendo il token CSRF.
     """
-    print("Tentativo di autenticazione automatica (Username)...")
+    print("Tentativo di autenticazione automatica (Zuppazappa)...")
     try:
         headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+            'Accept-Language': 'it-IT,it;q=0.9,en-US;q=0.8,en;q=0.7'
         }
-        # 1. Recupero della Home/Login per estrarre il token CSRF
+        
+        # 1. Recupero della Home per estrarre il token CSRF
         res_home = session.get(base_url, headers=headers, timeout=10, verify=False)
         res_home.raise_for_status()
         
@@ -48,31 +52,35 @@ def esegui_login(base_url):
         csrf_token = csrf_tag.get('content')
         logging.debug(f"[LOGIN] Token CSRF estratto: {csrf_token}")
         
-        # 2. Invio credenziali (usando l'username nel campo del form)
+        # 2. Invio credenziali. Nota: la chiave del form deve chiamarsi 'email' 
+        # anche se il valore inserito è l'username "Zuppazappa"
         login_url = f"{base_url}/api/user/login" 
         payload = {
             '_csrf': csrf_token,
-            'username': USER_USERNAME,
+            'email': USER_USERNAME, 
             'password': USER_PASSWORD
         }
         
         headers_post = headers.copy()
         headers_post['X-CSRF-TOKEN'] = csrf_token
-        headers_post['Referer'] = base_url
+        headers_post['Referer'] = f"{base_url}/login"
+        headers_post['Content-Type'] = 'application/x-www-form-urlencoded'
         
-        response = session.post(login_url, data=payload, headers=headers_post, timeout=10, verify=False)
+        # Effettuiamo la POST seguendo i redirect per vedere dove atterriamo
+        response = session.post(login_url, data=payload, headers=headers_post, timeout=10, verify=False, allow_redirects=True)
         response.raise_for_status()
         
-        logging.debug(f"[LOGIN] Status Code risposta: {response.status_code}")
-        logging.debug(f"[LOGIN] Lunghezza HTML risposta login: {len(response.text)} caratteri")
+        logging.debug(f"[LOGIN] URL di atterraggio post-login: {response.url}")
+        logging.debug(f"[LOGIN] Status Code finale: {response.status_code}")
         
-        # Verifica se la sessione si è agganciata controllando il sorgente della risposta
-        if "logout" in response.text.lower():
-            print("[OK] Autenticazione riuscita! Sessione registrata.")
-            return True
-        else:
-            print("[ERRORE] Il server ha risposto ma non risulta l'azione di logout. Verifica le credenziali.")
+        # Se l'URL finale contiene '/login', significa che il server ci ha respinti rimandandoci alla pagina di login
+        if "/login" in response.url:
+            print("[ERRORE] Login fallito. Il server ha respinto le credenziali reinviandoti al form.")
+            logging.error(f"[LOGIN] Autenticazione fallita. Pagina di destinazione errata: {response.url}")
             return False
+            
+        print("[OK] Autenticazione riuscita! Sessione registrata e attiva.")
+        return True
             
     except Exception as e:
         print(f"[ERRORE] Errore critico durante la chiamata di login: {e}")
