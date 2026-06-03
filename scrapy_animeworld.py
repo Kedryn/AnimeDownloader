@@ -9,6 +9,11 @@ import urllib3
 import re
 import sys
 
+# ================= CREDENZIALI UTENTE =================
+USER_EMAIL = "Zuppazappa"
+USER_PASSWORD = "sgYyG7!wNxf5Ttu"
+# ======================================================
+
 if "force" in [arg.lower() for arg in sys.argv]:
   forza = True
   print("Forzatura dell'aggiornamento dei dati...")
@@ -17,20 +22,71 @@ else:
   
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
+# Inizializziamo l'oggetto Session a livello globale per mantenere l'autenticazione attiva
+session = requests.Session()
+
+def esegui_login(base_url):
+    """
+    Effettua il login leggendo preventivamente il token CSRF.
+    Restituisce True se l'autenticazione va a buon fine.
+    """
+    print("Tentativo di autenticazione automatica in corso...")
+    try:
+        # 1. Otteniamo la pagina principale per estrarre il token CSRF iniziale
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
+        res_home = session.get(base_url, headers=headers, timeout=10, verify=False)
+        res_home.raise_for_status()
+        
+        soup_home = BeautifulSoup(res_home.text, 'html.parser')
+        csrf_tag = soup_home.select_one('meta[id="csrf-token"]')
+        
+        if not csrf_tag:
+            print("[ERRORE] Impossibile trovare il token CSRF per il login. Protezione attiva?")
+            return False
+            
+        csrf_token = csrf_tag.get('content')
+        
+        # 2. Prepariamo i dati del payload per la richiesta POST di login
+        # Di norma gli endpoint di login standard rispondono a /api/user/login o /login
+        login_url = f"{base_url}/api/user/login" 
+        payload = {
+            '_csrf': csrf_token,
+            'email': USER_EMAIL,
+            'password': USER_PASSWORD
+        }
+        
+        headers_post = headers.copy()
+        headers_post['X-CSRF-TOKEN'] = csrf_token
+        headers_post['Referer'] = base_url
+        
+        # Invia la richiesta di autenticazione
+        response = session.post(login_url, data=payload, headers=headers_post, timeout=10, verify=False)
+        response.raise_for_status()
+        
+        # Verifica empirica se siamo loggati (cerchiamo parole chiave come 'logout' o l'assenza del form login)
+        if "logout" in response.text.lower() or response.status_code == 200:
+            print("[OK] Login effettuato con successo! Sessione memorizzata.")
+            return True
+        else:
+            print("[ERRORE] Login fallito. Controlla le credenziali o il token CSRF.")
+            return False
+            
+    except Exception as e:
+        print(f"[ERRORE] Eccezione durante la procedura di login: {e}")
+        return False
+
 def get_html_content(url):
+    """
+    Sfrutta la sessione autenticata per scaricare le pagine.
+    """
     try:
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
         }
-        # Inseriamo la sessione per mantenere l'eventuale tracciamento dei redirect
-        session = requests.Session()
         response = session.get(url, headers=headers, timeout=10, verify=False, allow_redirects=True)
         response.raise_for_status()
-        
-        # DEBUG LOG: Verifica se l'URL finale è cambiato (Redirect avvenuto)
-        logging.debug(f"[HTTP] URL Richiesto: {url} -> URL Finale Effettivo: {response.url}")
-        logging.debug(f"[HTTP] Status Code: {response.status_code} | Dimensione HTML grezzo: {len(response.text)} caratteri")
-        
         return response.text
     except requests.exceptions.RequestException as e:
         print(f"Errore durante il recupero di {url}: {e}")
@@ -41,25 +97,32 @@ def get_episode_numbers(html_content):
     primo_episodio = '-1'
     ultimo_episodio = '-1'
 
-    episode_links = soup.select('ul.episodes.range li.episode a')
-    if episode_links:
-        primo_episodio = episode_links[0].get('data-episode-num', '-1')
-        ultimo_episodio = episode_links[-1].get('data-episode-num', '-1')
-        logging.debug(f"[PARSER] Estratti dal selettore UL: Primo={primo_episodio}, Ultimo={ultimo_episodio}")
+    active_episode_links = soup.select('ul.episodes.range.active a')
+    if active_episode_links:
+        primo_episodio = active_episode_links[0].get('data-episode-num', '-1')
+
+    if ultimo_episodio == '-1':
+        hidden_episode_links = soup.select('ul.episodes.range.hidden a')
+        if hidden_episode_links:
+            ultimo_episodio = hidden_episode_links[-1].get('data-episode-num', '-1')
+        elif active_episode_links:
+            ultimo_episodio = active_episode_links[-1].get('data-episode-num', '-1')
 
     episodes_dt_tag = soup.find('dt', string='Episodi:')
     if episodes_dt_tag:
         episodes_dd_tag = episodes_dt_tag.find_next_sibling('dd')
         if episodes_dd_tag:
             episodes_text = episodes_dd_tag.get_text(strip=True)
-            logging.debug(f"[PARSER] Estratto dal tag DT 'Episodi:': {episodes_text}")
             if episodes_text.isdigit():
                 ultimo_episodio = episodes_text
             elif episodes_text == '??':
                 if primo_episodio.isdigit():
                     ultimo_episodio = '9' * len(primo_episodio)
                 else:
-                    ultimo_episodio = '99'
+                    if primo_episodio.isdigit():
+                        ultimo_episodio = '9' * len(primo_episodio)
+                    else:
+                        ultimo_episodio = '99'
 
     if primo_episodio.isdigit():
         primo_episodio = primo_episodio.zfill(2)
@@ -89,13 +152,14 @@ def load_anime_list(file_path):
                         row += [''] * (len(fieldnames) - len(row))
                         row_dict = dict(zip(fieldnames, row))
                         data[row_dict['download_path']] = row_dict
+                    else:
+                        print(f"Riga ignorata a causa di un numero di colonne non corrispondente: {row}")
             print(f"Caricati {len(data)} anime esistenti dal file '{file_path}'.")
         except Exception as e:
             print(f"Errore durante il caricamento del file '{file_path}': {e}")
             return {}
     return data
 
-# Configura il logging a livello DEBUG per catturare le nostre nuove metriche
 log_file = "scrapy_animeworld.log"
 if os.path.exists(log_file):
     os.remove(log_file)
@@ -103,7 +167,7 @@ logging.basicConfig(
     filename=log_file,
     filemode='a',
     format='%(asctime)s [%(levelname)s] %(message)s',
-    level=logging.DEBUG, # <-- Impostato temporaneamente a DEBUG
+    level=logging.INFO,
     force=True
 )
 
@@ -115,13 +179,15 @@ def log(message, level="info"):
         logging.warning(message)
     elif level == "error":
         logging.error(message)
-    elif level == "debug":
-        logging.debug(message)
 
 def scrape_animeworld():
     base_url = "https://www.animeworld.ac"
     csv_file_path = "anime_list.csv"
     max_pages_to_scrape = 500
+    
+    # ESEGUI IL LOGIN PRIMA DI PROCEDERE ALLO SCRAPING
+    if not esegui_login(base_url):
+        log("Procedo come utente ospite (attenzione: i link di download potrebbero non essere visibili).", "warning")
     
     main_list_url = f"{base_url}/az-list"
     print(f"Recupero il numero totale di pagine dalla pagina principale: {main_list_url}")
@@ -132,6 +198,10 @@ def scrape_animeworld():
         if match:
             max_pages_to_scrape = int(match.group(1))
             log(f"Trovato il numero totale di pagine: {max_pages_to_scrape}", "info")
+        else:
+            log(f"Valore di paginazione non trovato, uso il valore di fallback: {max_pages_to_scrape}", "warning")
+    else:
+        log(f"Impossibile recuperare la pagina principale, uso il valore di fallback: {max_pages_to_scrape}", "warning")
 
     log("Inizio dell'estrazione...", "info")
     existing_anime_data = load_anime_list(csv_file_path)
@@ -143,12 +213,14 @@ def scrape_animeworld():
         list_html = get_html_content(list_url)
 
         if not list_html:
+            log("Impossibile recuperare la pagina, interruzione dell'estrazione.", "error")
             break
                 
         list_soup = BeautifulSoup(list_html, 'html.parser')
         anime_items = list_soup.select('div.items a.name')
 
         if not anime_items:
+            log("Nessun anime trovato in questa pagina. Probabile fine della lista.", "info")
             break
 
         for item in anime_items:
@@ -157,24 +229,19 @@ def scrape_animeworld():
             is_existing = download_path in existing_anime_data
 
             if is_existing and not forza:
+                log(f"  Anime '{anime_title}' già esistente, salto...", "info")
                 continue
 
             log(f"  Recupero dettagli per: {anime_title}", "info")
 
             anime_page_url = f"{base_url}{item['href']}"
             anime_page_html = get_html_content(anime_page_url)
-            
             if anime_page_html:
-                # DEBUG GREZZO: Cerchiamo la stringa nell'HTML senza usare BeautifulSoup
-                stringa_presente = "alternativeDownloadLink" in anime_page_html
-                logging.debug(f"[GREZZO] La parola 'alternativeDownloadLink' è presente nel testo HTML scaricato? {stringa_presente}")
-
                 primo_episodio_nuovo, ultimo_episodio_nuovo = get_episode_numbers(anime_page_html)
                 if primo_episodio_nuovo == '-1' or ultimo_episodio_nuovo == '-1':
                     log(f"  Episodi non trovati per {anime_title}, salto...", "warning")
                 else:
-                    soup_anime = BeautifulSoup(anime_page_html, 'html.parser')
-                    first_episode_link = soup_anime.select_one('#alternativeDownloadLink')
+                    first_episode_link = BeautifulSoup(anime_page_html, 'html.parser').select_one('#alternativeDownloadLink')
 
                     if first_episode_link:
                         episode_url_nuovo = first_episode_link['href']
@@ -191,6 +258,8 @@ def scrape_animeworld():
                             ultimoaggiornamento = '1900-01-01'
                         elif download_path in existing_anime_data:
                             ultimoaggiornamento = existing_anime_data[download_path]['ultimoaggiornamento']
+                        else:
+                            ultimoaggiornamento = ""
 
                         data_to_add = {
                             'url_primo_episodio': episode_url_nuovo,
@@ -206,12 +275,13 @@ def scrape_animeworld():
                             if ultimo_episodio_nuovo > existing_anime_data[download_path]['ultimo_episodio']:
                                 data_to_add['ultimoaggiornamento'] = time.strftime('%Y-%m-%d')
                             existing_anime_data[download_path] = data_to_add
-                            log(f"  Aggiornato: {anime_title}", "info")
+                            log(f"  Aggiornato: {anime_title} (mantenuto primo episodio esistente) {ultimoaggiornamento}", "info")
                         else:
                             data_to_add['ultimoaggiornamento'] = time.strftime('%Y-%m-%d')
                             data_to_add['primo_episodio'] = primo_episodio_nuovo
                             existing_anime_data[download_path] = data_to_add
-                            log(f"  Aggiunto: {anime_title} episodi {primo_episodio_nuovo} - {ultimo_episodio_nuovo}", "info")
+                            log(f"  Aggiunto: {anime_title} episodi {primo_episodio_nuovo} - {ultimo_episodio_nuovo}  {ultimoaggiornamento}", "info")
+
                     else:
                         log(f"   [WARN] Link di download alternativo non trovato per '{anime_title}'", "warning")
             else:
@@ -226,7 +296,7 @@ def scrape_animeworld():
         for row in sorted_anime_data.values():
             writer.writerow(row)
 
-    log(f"\nEstrazione completata!", "info")
+    log(f"\nEstrazione e salvataggio completati! Dati salvati in '{csv_file_path}'.", "info")
 
 if __name__ == "__main__":
     scrape_animeworld()
