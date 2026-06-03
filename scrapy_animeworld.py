@@ -137,8 +137,8 @@ logging.basicConfig(
     filename=log_file,
     filemode='a',
     format='%(asctime)s [%(levelname)s] %(message)s',
-     # Imposta il livello di logging a INFO per registrare i messaggi aggiunti
-    level=logging.INFO,
+     # Imposta il livello di logging a WARNING
+    level=logging.WARNING,
     force=True
 )
 
@@ -189,12 +189,18 @@ def scrape_animeworld():
 
     # Carica i dati esistenti dal file CSV in un array
     existing_anime_data = load_anime_list(csv_file_path)
+    # Assicura che ogni riga abbia 7 colonne (aggiunge una colonna vuota se necessario)
+    #for key, row in existing_anime_data.items():
+    #    if len(row) == 6:
+    #        # Aggiunge una colonna vuota chiamata 'ultimoaggiornamento' se mancante
+    #        # Imposta la data corrente nel campo 'ultimoaggiornamento'
+    #        row['ultimoaggiornamento'] = time.strftime('%Y-%m-%d')
 
 
     page_number = 1
     while page_number <= max_pages_to_scrape:
         list_url = f"{base_url}/az-list?page={page_number}"
-        log(f"Processo lista a pagina: {page_number}", "info")
+        log(f"Recupero la pagina della lista: {list_url}", "info")
         list_html = get_html_content(list_url)
 
         if not list_html:
@@ -213,7 +219,9 @@ def scrape_animeworld():
 
         for item in anime_items:
             # Aggiornato per ottenere il titolo dall'attributo 'data-jtitle'
-            anime_title = item.get('data-jtitle', '').strip().replace('#', '')
+            anime_title = item.get('data-jtitle', '').strip()
+            # Rimuovi i caratteri '#' dal titolo
+            anime_title = anime_title.replace('#', '')
             
             # Sanitizza il titolo per usarlo come nome di percorso
             download_path = sanitize_title(anime_title)
@@ -225,9 +233,10 @@ def scrape_animeworld():
                 log(f"  Anime '{anime_title}' già esistente, salto...", "info")
                 continue  # Salta al prossimo elemento nel ciclo
 
+            anime_page_url = f"{base_url}{item['href']}"
+            
             log(f"  Recupero dettagli per: {anime_title}", "info")
 
-            anime_page_url = f"{base_url}{item['href']}"
             anime_page_html = get_html_content(anime_page_url)
             if anime_page_html:
 
@@ -241,15 +250,15 @@ def scrape_animeworld():
 
                     if first_episode_link:
                         episode_url_nuovo = first_episode_link['href']
-                        log(f"   [OK] Link alternativo trovato per '{anime_title}': {episode_url_nuovo}", "info")
                         
                         # Cerca il numero dell'episodio nel link usando le espressioni regolari per entrambi i casi SUB e ITA
+                        # La regex è stata modificata per essere più generica
                         match = re.search(r'_(\d+)_(?:SUB|ITA)', episode_url_nuovo)
 
                         if match:
                             episode_num_from_url = match.group(1)
                             # Se il numero dell'episodio è '01' (o simili), lo sostituisce con '*'
-                            if episode_num_from_url in ['01', '001', '0001', '00']:
+                            if episode_num_from_url in ['01', '001', '0001','00']:
                                 episode_url_nuovo = re.sub(r'Ep_\d+_(SUB|ITA)', 'Ep_*_\\1', episode_url_nuovo)
 
                         # Inizializza ultimoaggiornamento con un valore di default
@@ -286,7 +295,7 @@ def scrape_animeworld():
                             log(f"  Aggiunto: {anime_title} episodi {primo_episodio_nuovo} - {ultimo_episodio_nuovo}  {ultimoaggiornamento}", "info")
 
                     else:
-                        log(f"   [WARN] Link di download alternativo non trovato per '{anime_title}'", "warning")
+                        log(f"  Link di download alternativo non trovato per {anime_title}" , "warning")
 
                     # Aggiungi un piccolo ritardo per evitare di sovraccaricare il server
                     #time.sleep(1)
