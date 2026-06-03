@@ -28,8 +28,10 @@ def get_html_content(url):
         print(f"Errore durante il recupero di {url}: {e}")
         return None
 
-def get_episode_numbers(html_content):
-    soup = BeautifulSoup(html_content, 'html.parser')
+def get_episode_numbers(soup):
+    """
+    Riceve l'oggetto soup già parsato ed estrae i numeri degli episodi.
+    """
     primo_episodio = '-1'
     ultimo_episodio = '-1'
 
@@ -89,7 +91,7 @@ def load_anime_list(file_path):
             return {}
     return data
 
-# Configura il logging a livello DEBUG per non perdere nessun passaggio
+# Configura il logging a livello DEBUG
 log_file = "scrapy_animeworld.log"
 if os.path.exists(log_file):
     os.remove(log_file)
@@ -164,43 +166,42 @@ def scrape_animeworld():
                 need_scan = True
                 ragione_scan = "Forzatura aggiornamento globale (--force)"
             else:
-                # L'anime esiste, estraiamo il server per decidere lo skip
                 old_url = existing_anime_data[download_path]['url_primo_episodio']
-                srv_match = re.search(r'(srv\d+)', old_url) # Regex semplificata per catturare solo srvXX
+                srv_match = re.search(r'(srv\d+)', old_url)
                 
                 if srv_match:
-                    srv_key = srv_match.group(1) # Es: srv15
+                    srv_key = srv_match.group(1)
                     if srv_key not in srv_verificati:
                         need_scan = True
                         ragione_scan = f"Primo incontro con il server {srv_key}. Verifico host aggiornato..."
                     else:
-                        # DEBUG LOG: Spiega chiaramente perché l'anime viene saltato velocemente
                         log(f" [SKIP] '{anime_title}' già presente. Server {srv_key} già verificato oggi.", "debug")
                 else:
-                    # Se non trova srvXX nel vecchio link (es. link rotto o formato strano), forza la scansione per correggerlo
                     need_scan = True
                     ragione_scan = f"Impossibile determinare il server srvXX dal vecchio URL: {old_url}"
 
             if not need_scan:
                 continue
 
-            # Se siamo qui, stiamo per fare una chiamata HTTP. Logghiamo la motivazione.
             log(f" [SCAN] Entro in '{anime_title}'. Motivo: {ragione_scan}", "info")
 
             anime_page_url = f"{base_url}{item['href']}"
             anime_page_html = get_html_content(anime_page_url)
             
             if anime_page_html:
-                primo_episodio_nuovo, ultimo_episodio_nuovo = get_episode_numbers(anime_page_html)
+                # ISTANZIAMO LA SOUP UNA VOLTA SOLA PER QUESTA PAGINA ANIME
+                anime_soup = BeautifulSoup(anime_page_html, 'html.parser')
+
+                primo_episodio_nuovo, ultimo_episodio_nuovo = get_episode_numbers(anime_soup)
                 if primo_episodio_nuovo == '-1' or ultimo_episodio_nuovo == '-1':
                     log(f"   [WARN] Episodi non trovati nella pagina di '{anime_title}'", "warning")
                     continue
 
-                first_episode_link = BeautifulSoup(anime_page_html, 'html.parser').select_one('#alternativeDownloadLink')
+                # Cerchiamo il link usando la soup esistente, senza ricrearla
+                first_episode_link = anime_soup.select_one('#alternativeDownloadLink')
                 if first_episode_link:
                     episode_url_nuovo = first_episode_link['href']
                     
-                    # Estrazione e mappatura host con la regex completa
                     new_srv_match = re.search(r'(srv\d+)-([^./]+)', episode_url_nuovo)
                     if new_srv_match:
                         srv_key = new_srv_match.group(1)   
@@ -261,7 +262,7 @@ def scrape_animeworld():
 
     # --- SOSTITUZIONE MASSIVA DEGLI HOST ---
     if srv_mapping:
-        log("\n--- APPLICAZIONE CORREZIONI HOST MASSIVE ---", "info")
+        log("\n--- APPLICAZIONE CORRETTIVI HOST MASSIVI ---", "info")
         log(f"Mappa dei cambiamenti registrati: {srv_mapping}", "info")
         for key, anime in existing_anime_data.items():
             url = anime['url_primo_episodio']
