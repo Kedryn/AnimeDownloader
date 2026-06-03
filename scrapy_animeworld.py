@@ -110,8 +110,10 @@ def scrape_animeworld():
     csv_file_path = "anime_list.csv"
     max_pages_to_scrape = 500
     
-    # Dizionario per mappare srvXX -> srvXX-nuovaparola (Es: {"srv18": "srv18-pluto"})
+    # Mappa dinamica degli host aggiornati durante questa sessione (Es: {"srv18": "srv18-pluto"})
     srv_mapping = {}
+    # Set per tenere traccia di quali chiavi srv (es. "srv18") abbiamo già verificato essere valide
+    srv_verificati = set()
 
     main_list_url = f"{base_url}/az-list"
     main_list_html = get_html_content(main_list_url)
@@ -145,8 +147,23 @@ def scrape_animeworld():
             download_path = sanitize_title(anime_title)
             is_existing = download_path in existing_anime_data
 
-            # Se esiste già e non forziamo, saltiamo la richiesta HTTP ma teniamo l'elemento
-            if is_existing and not forza:
+            # Determiniamo se dobbiamo scansionare la pagina dell'anime
+            need_scan = False
+            
+            if not is_existing or forza:
+                # Se l'anime è nuovo o c'è il force, va scansionato sempre
+                need_scan = True
+            else:
+                # Se l'anime esiste già, controlliamo se il suo host è già stato verificato in questa sessione
+                old_url = existing_anime_data[download_path]['url_primo_episodio']
+                srv_match = re.search(r'(srv\d+)-([^./]+)', old_url)
+                if srv_match:
+                    srv_key = srv_match.group(1) # Es: srv18
+                    # Se il server di questo anime non è ancora stato verificato oggi, forziamo il check di questo specifico anime
+                    if srv_key not in srv_verificati:
+                        need_scan = True
+
+            if not need_scan:
                 continue
 
             anime_page_url = f"{base_url}{item['href']}"
@@ -161,13 +178,15 @@ def scrape_animeworld():
                 if first_episode_link:
                     episode_url_nuovo = first_episode_link['href']
                     
-                    # Intercettiamo e memorizziamo il srvXX-parola corrente dall'URL appena preso
-                    # Regex cerca qualcosa tipo: srv18-pippo.dominio.com o https://srv18-pippo...
+                    # Estraiamo il nome host reale e aggiornato dalla pagina
                     srv_match = re.search(r'(srv\d+)-([^./]+)', episode_url_nuovo)
                     if srv_match:
                         srv_key = srv_match.group(1)      # Es: srv18
                         srv_full = srv_match.group(0)     # Es: srv18-pluto
+                        
+                        # Salviamo la mappatura e marchiamo il server come verificato
                         srv_mapping[srv_key] = srv_full
+                        srv_verificati.add(srv_key)
 
                     match_ep = re.search(r'_(\d+)_(?:SUB|ITA)', episode_url_nuovo)
                     if match_ep and match_ep.group(1) in ['01', '001', '0001', '00']:
@@ -205,22 +224,20 @@ def scrape_animeworld():
 
         page_number += 1
 
-    # --- NUOVA LOGICA: Allineamento srv dinamico ---
+    # --- Sostituzione massiva degli host obsoleti basata sulla mappa generata ---
     if srv_mapping:
-        log("\nVerifica e aggiornamento degli host srv obsoleti...", "info")
+        log("\nAllineamento degli host srv per tutti i link saltati...", "info")
         for key, anime in existing_anime_data.items():
             url = anime['url_primo_episodio']
-            # Cerca srvXX nel vecchio URL per vedere se abbiamo una traduzione nuova
             old_srv_match = re.search(r'(srv\d+)-([^./]+)', url)
             if old_srv_match:
-                srv_key = old_srv_match.group(1)   # Es: srv18
-                old_full = old_srv_match.group(0)  # Es: srv18-pippo
+                srv_key = old_srv_match.group(1)
+                old_full = old_srv_match.group(0)
                 
-                # Se abbiamo trovato un srv18 aggiornato nella sessione ed è diverso dal vecchio
+                # Se abbiamo scoperto che il srvXX ha una nuova parola, lo aggiorniamo nel dizionario
                 if srv_key in srv_mapping and srv_mapping[srv_key] != old_full:
-                    new_url = url.replace(old_full, srv_mapping[srv_key])
-                    existing_anime_data[key]['url_primo_episodio'] = new_url
-                    log(f" -> Aggiornato host per '{anime['titolo']}': {old_full} => {srv_mapping[srv_key]}", "info")
+                    existing_anime_data[key]['url_primo_episodio'] = url.replace(old_full, srv_mapping[srv_key])
+                    log(f" -> Corretto host per '{anime['titolo']}': {old_full} => {srv_mapping[srv_key]}", "info")
 
     # Ordinamento sicuro per data decrescente
     sorted_anime_data = sorted(
