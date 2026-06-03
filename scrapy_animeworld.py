@@ -258,4 +258,4 @@ def scrape_animeworld():
     log(f"\nEstrazione e salvataggio completati! Dati salvati in '{csv_file_path}'.", "info")
 
 if __name__ == "__main__":
-    scrape_animeworld()
+    scrape_animeworld() 
