@@ -22,9 +22,15 @@ def get_html_content(url):
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
         }
-        # allow_redirects=True è implicito in requests.get, quindi segue il redirect alla pagina col token
-        response = requests.get(url, headers=headers, timeout=10, verify=False, allow_redirects=True)
+        # Inseriamo la sessione per mantenere l'eventuale tracciamento dei redirect
+        session = requests.Session()
+        response = session.get(url, headers=headers, timeout=10, verify=False, allow_redirects=True)
         response.raise_for_status()
+        
+        # DEBUG LOG: Verifica se l'URL finale è cambiato (Redirect avvenuto)
+        logging.debug(f"[HTTP] URL Richiesto: {url} -> URL Finale Effettivo: {response.url}")
+        logging.debug(f"[HTTP] Status Code: {response.status_code} | Dimensione HTML grezzo: {len(response.text)} caratteri")
+        
         return response.text
     except requests.exceptions.RequestException as e:
         print(f"Errore durante il recupero di {url}: {e}")
@@ -35,18 +41,18 @@ def get_episode_numbers(html_content):
     primo_episodio = '-1'
     ultimo_episodio = '-1'
 
-    # NUOVO SELETTORE PER LA PAGINA DI PLAY: prende l'attributo data-episode-num del primo e ultimo 'li'
     episode_links = soup.select('ul.episodes.range li.episode a')
     if episode_links:
         primo_episodio = episode_links[0].get('data-episode-num', '-1')
         ultimo_episodio = episode_links[-1].get('data-episode-num', '-1')
+        logging.debug(f"[PARSER] Estratti dal selettore UL: Primo={primo_episodio}, Ultimo={ultimo_episodio}")
 
-    # Fallback sul tag <dt> se la lista fallisce
     episodes_dt_tag = soup.find('dt', string='Episodi:')
     if episodes_dt_tag:
         episodes_dd_tag = episodes_dt_tag.find_next_sibling('dd')
         if episodes_dd_tag:
             episodes_text = episodes_dd_tag.get_text(strip=True)
+            logging.debug(f"[PARSER] Estratto dal tag DT 'Episodi:': {episodes_text}")
             if episodes_text.isdigit():
                 ultimo_episodio = episodes_text
             elif episodes_text == '??':
@@ -89,6 +95,7 @@ def load_anime_list(file_path):
             return {}
     return data
 
+# Configura il logging a livello DEBUG per catturare le nostre nuove metriche
 log_file = "scrapy_animeworld.log"
 if os.path.exists(log_file):
     os.remove(log_file)
@@ -96,7 +103,7 @@ logging.basicConfig(
     filename=log_file,
     filemode='a',
     format='%(asctime)s [%(levelname)s] %(message)s',
-    level=logging.INFO,
+    level=logging.DEBUG, # <-- Impostato temporaneamente a DEBUG
     force=True
 )
 
@@ -108,6 +115,8 @@ def log(message, level="info"):
         logging.warning(message)
     elif level == "error":
         logging.error(message)
+    elif level == "debug":
+        logging.debug(message)
 
 def scrape_animeworld():
     base_url = "https://www.animeworld.ac"
@@ -152,16 +161,20 @@ def scrape_animeworld():
 
             log(f"  Recupero dettagli per: {anime_title}", "info")
 
-            # Questa URL ora è un link di tipo /play/nome-anime.ID
             anime_page_url = f"{base_url}{item['href']}"
             anime_page_html = get_html_content(anime_page_url)
             
             if anime_page_html:
+                # DEBUG GREZZO: Cerchiamo la stringa nell'HTML senza usare BeautifulSoup
+                stringa_presente = "alternativeDownloadLink" in anime_page_html
+                logging.debug(f"[GREZZO] La parola 'alternativeDownloadLink' è presente nel testo HTML scaricato? {stringa_presente}")
+
                 primo_episodio_nuovo, ultimo_episodio_nuovo = get_episode_numbers(anime_page_html)
                 if primo_episodio_nuovo == '-1' or ultimo_episodio_nuovo == '-1':
                     log(f"  Episodi non trovati per {anime_title}, salto...", "warning")
                 else:
-                    first_episode_link = BeautifulSoup(anime_page_html, 'html.parser').select_one('#alternativeDownloadLink')
+                    soup_anime = BeautifulSoup(anime_page_html, 'html.parser')
+                    first_episode_link = soup_anime.select_one('#alternativeDownloadLink')
 
                     if first_episode_link:
                         episode_url_nuovo = first_episode_link['href']
