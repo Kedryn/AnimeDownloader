@@ -114,74 +114,16 @@ def log(message, level="info"):
         logging.debug(message)
 
 
-def refresh_srv_hosts_preventive(existing_anime_data, base_url):
-    """
-    Esegue un controllo preliminare mirato. Prende un solo anime campione per ogni
-    server srvXX registrato, ne scarica la pagina e mappa l'host aggiornato corrente.
-    """
-    srv_samples = {}
-    # Estrae un anime di test per ogni srvXX univoco
-    for path, anime in existing_anime_data.items():
-        m = re.search(r'(srv\d+)-([^./]+)', anime['url_primo_episodio'])
-        if m:
-            srv_key = m.group(1) # Es: srv18
-            if srv_key not in srv_samples:
-                # Ricaviamo l'URI dell'anime dall'url del download o approssimativo
-                # Memorizziamo il path e l'attuale stringa intera srvXX-vecchia
-                srv_samples[srv_key] = {
-                    'old_full': m.group(0),
-                    'path': path,
-                    'titolo': anime['titolo']
-                }
-
-    if not srv_samples:
-        return existing_anime_data
-
-    log(f"Verifica host: controllo preventivo su {len(srv_samples)} server srvXX rilevati nel CSV...", "info")
-    srv_mapping = {}
-
-    for srv_key, info in srv_samples.items():
-        # Ricostruiamo l'URL della pagina dell'anime su animeworld usando il download_path (slug)
-        anime_page_url = f"{base_url}/anime/{info['path']}"
-        html = get_html_content(anime_page_url)
-        
-        if html:
-            soup = BeautifulSoup(html, 'html.parser')
-            first_episode_link = soup.select_one('#alternativeDownloadLink')
-            if first_episode_link:
-                url_nuovo = first_episode_link['href']
-                match_new_srv = re.search(r'(srv\d+)-([^./]+)', url_nuovo)
-                if match_new_srv:
-                    new_full = match_new_srv.group(0) # Es: srv18-pluto
-                    if info['old_full'] != new_full:
-                        srv_mapping[info['old_full']] = new_full
-                        log(f" [Rilevato cambio host] {info['old_full']} => {new_full}", "info")
-
-    # Se ci sono cambi di host, aggiorna massivamente TUTTO il dizionario prima dello scraping
-    if srv_mapping:
-        log(f"Applicazione modifiche su tutti i link affetti da cambi host...", "info")
-        for key, anime in existing_anime_data.items():
-            url = anime['url_primo_episodio']
-            for old_full, new_full in srv_mapping.items():
-                if old_full in url:
-                    existing_anime_data[key]['url_primo_episodio'] = url.replace(old_full, new_full)
-    else:
-        log("Tutti i nomi host srvXX risultano già aggiornati.", "info")
-
-    return existing_anime_data
-
-
 def scrape_animeworld():
     base_url = "https://www.animeworld.ac"
     csv_file_path = "anime_list.csv"
     max_pages_to_scrape = 500
     
-    # 1. Carica i dati esistenti
     existing_anime_data = load_anime_list(csv_file_path)
 
-    # 2. INVOCA IL CONTROLLO PREVENTIVO (Eseguito sempre all'avvio)
-    if existing_anime_data:
-        existing_anime_data = refresh_srv_hosts_preventive(existing_anime_data, base_url)
+    # Strutture dati per la mappatura dinamica degli host
+    srv_mapping = {}      # Memorizza i cambi riscontrati (Es: {"srv15-kaccarazza": "srv15-parrocchia"})
+    srv_verificati = set() # Tiene traccia dei srvXX (es: "srv15") già verificati in questa sessione
 
     main_list_url = f"{base_url}/az-list"
     main_list_html = get_html_content(main_list_url)
@@ -208,15 +150,32 @@ def scrape_animeworld():
         if not anime_items:
             break
 
-        # Ottimizzazione: se l'anime è in cache e NON abbiamo il force, saltiamo subito
         for item in anime_items:
             anime_title = item.get('data-jtitle', '').strip().replace('#', '')
             download_path = sanitize_title(anime_title)
             is_existing = download_path in existing_anime_data
 
-            if is_existing and not forza:
+            # Determiniamo se dobbiamo scansionare la pagina dell'anime
+            need_scan = False
+            
+            if not is_existing or forza:
+                # Nuovo anime o parametro force attivo: scansione obbligatoria
+                need_scan = True
+            else:
+                # L'anime esiste già. Estraiamo il srvXX per vedere se lo abbiamo già verificato oggi
+                old_url = existing_anime_data[download_path]['url_primo_episodio']
+                srv_match = re.search(r'(srv\d+)-([^./]+)', old_url)
+                if srv_match:
+                    srv_key = srv_match.group(1) # Es: srv15
+                    if srv_key not in srv_verificati:
+                        # Primo incontro con questo server nella sessione corrente: forziamo la scansione per aggiornare l'host
+                        need_scan = True
+
+            if not need_scan:
+                # Se l'anime esiste e il suo server è già stato verificato, saltiamo istantaneamente
                 continue
 
+            # Procediamo con lo scaricamento della pagina dell'anime (usando l'href corretto fornito dal sito)
             anime_page_url = f"{base_url}{item['href']}"
             anime_page_html = get_html_content(anime_page_url)
             
@@ -229,6 +188,25 @@ def scrape_animeworld():
                 if first_episode_link:
                     episode_url_nuovo = first_episode_link['href']
                     
+                    # Logica di cattura e mappatura dell'host
+                    new_srv_match = re.search(r'(srv\d+)-([^./]+)', episode_url_nuovo)
+                    if new_srv_match:
+                        srv_key = new_srv_match.group(1)   # Es: srv15
+                        new_full = new_srv_match.group(0)  # Es: srv15-parrocchia
+                        
+                        # Se l'anime esisteva già nel CSV, confrontiamo il vecchio host con quello appena trovato
+                        if is_existing:
+                            old_url = existing_anime_data[download_path]['url_primo_episodio']
+                            old_srv_match = re.search(r'(srv\d+)-([^./]+)', old_url)
+                            if old_srv_match:
+                                old_full = old_srv_match.group(0) # Es: srv15-kaccarazza
+                                if old_full != new_full:
+                                    srv_mapping[old_full] = new_full
+                                    log(f" [Host Variato Rilevato] Mappato: {old_full} => {new_full}", "info")
+                        
+                        # Marchiamo il server srvXX come verificato per questa sessione
+                        srv_verificati.add(srv_key)
+
                     match_ep = re.search(r'_(\d+)_(?:SUB|ITA)', episode_url_nuovo)
                     if match_ep and match_ep.group(1) in ['01', '001', '0001', '00']:
                         episode_url_nuovo = re.sub(r'Ep_\d+_(SUB|ITA)', 'Ep_*_\\1', episode_url_nuovo)
@@ -264,6 +242,17 @@ def scrape_animeworld():
                     existing_anime_data[download_path] = data_to_add
 
         page_number += 1
+
+    # --- SOSTITUZIONE MASSIVA DEGLI HOST ---
+    # Al termine dello scraping, applichiamo la mappa dei cambi rilevati a tutti gli anime che erano stati saltati
+    if srv_mapping:
+        log("\nApplicazione massiva delle correzioni host su tutti i record saltati...", "info")
+        for key, anime in existing_anime_data.items():
+            url = anime['url_primo_episodio']
+            for old_full, new_full in srv_mapping.items():
+                if old_full in url:
+                    existing_anime_data[key]['url_primo_episodio'] = url.replace(old_full, new_full)
+                    log(f" -> Aggiornato link per '{anime['titolo']}': {old_full} => {new_full}", "info")
 
     # Ordinamento sicuro per data decrescente
     sorted_anime_data = sorted(
