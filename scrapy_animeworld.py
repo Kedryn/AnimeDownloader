@@ -9,11 +9,6 @@ import urllib3
 import re
 import sys
 
-# ================= CREDENZIALI UTENTE =================
-USER_USERNAME = "Zuppazappa"
-USER_PASSWORD = "sgYyG7!wNxf5Ttu"
-# ======================================================
-
 if "force" in [arg.lower() for arg in sys.argv]:
   forza = True
   print("Forzatura dell'aggiornamento dei dati...")
@@ -22,68 +17,45 @@ else:
   
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-# Sessione globale per mantenere persistenti i cookie di autenticazione
 session = requests.Session()
 
-def esegui_login(base_url):
+def carica_cookie_e_verifica(base_url):
     """
-    Effettua il login usando l'username mappato sul campo 'email' richiesto dal form,
-    gestendo il token CSRF.
+    Legge il cookie dal file cookie.txt e verifica se la sessione è valida
+    cercando l'avatar o il nome utente nella Home Page.
     """
-    print("Tentativo di autenticazione automatica (Zuppazappa)...")
+    cookie_file = "cookie.txt"
+    if not os.path.exists(cookie_file):
+        print(f"[ERRORE] File '{cookie_file}' non trovato. Crealo e inserisci il valore di sessionId.")
+        return False
+        
+    with open(cookie_file, 'r', encoding='utf-8') as f:
+        cookie_valore = f.read().strip()
+        
+    if not cookie_valore:
+        print(f"[ERRORE] Il file '{cookie_file}' è vuoto.")
+        return False
+
+    # Iniettiamo il NUOVO cookie sessionId nella sessione di requests
+    session.cookies.set('sessionId', cookie_valore, domain='www.animeworld.ac')
+    
+    # Test di verifica sulla Home Page
     try:
         headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
-            'Accept-Language': 'it-IT,it;q=0.9,en-US;q=0.8,en;q=0.7'
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
         }
-        
-        # 1. Recupero della Home per estrarre il token CSRF
-        res_home = session.get(base_url, headers=headers, timeout=10, verify=False)
-        res_home.raise_for_status()
-        
-        soup_home = BeautifulSoup(res_home.text, 'html.parser')
-        csrf_tag = soup_home.select_one('meta[id="csrf-token"]')
-        
-        if not csrf_tag:
-            print("[ERRORE LOGIN] Impossibile trovare il token CSRF iniziale.")
-            return False
-            
-        csrf_token = csrf_tag.get('content')
-        logging.debug(f"[LOGIN] Token CSRF estratto: {csrf_token}")
-        
-        # 2. Invio credenziali. Nota: la chiave del form deve chiamarsi 'email' 
-        # anche se il valore inserito è l'username "Zuppazappa"
-        login_url = f"{base_url}/api/user/login" 
-        payload = {
-            '_csrf': csrf_token,
-            'email': USER_USERNAME, 
-            'password': USER_PASSWORD
-        }
-        
-        headers_post = headers.copy()
-        headers_post['X-CSRF-TOKEN'] = csrf_token
-        headers_post['Referer'] = f"{base_url}/login"
-        headers_post['Content-Type'] = 'application/x-www-form-urlencoded'
-        
-        # Effettuiamo la POST seguendo i redirect per vedere dove atterriamo
-        response = session.post(login_url, data=payload, headers=headers_post, timeout=10, verify=False, allow_redirects=True)
+        response = session.get(base_url, headers=headers, timeout=10, verify=False)
         response.raise_for_status()
         
-        logging.debug(f"[LOGIN] URL di atterraggio post-login: {response.url}")
-        logging.debug(f"[LOGIN] Status Code finale: {response.status_code}")
-        
-        # Se l'URL finale contiene '/login', significa che il server ci ha respinti rimandandoci alla pagina di login
-        if "/login" in response.url:
-            print("[ERRORE] Login fallito. Il server ha respinto le credenziali reinviandoti al form.")
-            logging.error(f"[LOGIN] Autenticazione fallita. Pagina di destinazione errata: {response.url}")
+        # Verifica se siamo loggati (cerchiamo la stringa del tuo utente o il menu del profilo nell'HTML)
+        if "zuppazappa" in response.text.lower() or "logout" in response.text.lower():
+            print("[OK] Sessione verificata con successo via cookie.txt! Modalità autenticata attiva.")
+            return True
+        else:
+            print("[ERRORE] Il cookie inserito in cookie.txt non è valido o è scaduto (Accesso negato).")
             return False
-            
-        print("[OK] Autenticazione riuscita! Sessione registrata e attiva.")
-        return True
-            
     except Exception as e:
-        print(f"[ERRORE] Errore critico durante la chiamata di login: {e}")
+        print(f"[ERRORE] Impossibile contattare il server per verificare il cookie: {e}")
         return False
 
 def get_html_content(url):
@@ -93,11 +65,7 @@ def get_html_content(url):
         }
         response = session.get(url, headers=headers, timeout=10, verify=False, allow_redirects=True)
         response.raise_for_status()
-        
-        # LOG DI DEBUG HTTP
-        logging.debug(f"[HTTP] URL: {url} -> URL Finale: {response.url}")
-        logging.debug(f"[HTTP] Status: {response.status_code} | Dimensione HTML: {len(response.text)} caratteri")
-        
+        logging.debug(f"[HTTP] URL: {url} -> URL Finale: {response.url} | Dimensione: {len(response.text)} byte")
         return response.text
     except requests.exceptions.RequestException as e:
         print(f"Errore durante il recupero di {url}: {e}")
@@ -112,7 +80,6 @@ def get_episode_numbers(html_content):
     if episode_links:
         primo_episodio = episode_links[0].get('data-episode-num', '-1')
         ultimo_episodio = episode_links[-1].get('data-episode-num', '-1')
-        logging.debug(f"[PARSER] Estratti da UL: Primo={primo_episodio}, Ultimo={ultimo_episodio}")
 
     episodes_dt_tag = soup.find('dt', string='Episodi:')
     if episodes_dt_tag:
@@ -155,13 +122,12 @@ def load_anime_list(file_path):
                         row += [''] * (len(fieldnames) - len(row))
                         row_dict = dict(zip(fieldnames, row))
                         data[row_dict['download_path']] = row_dict
-            print(f"Caricati {len(data)} anime esistenti dal file '{file_path}'.")
+            print(f"Caricati {len(data)} anime esistenti dal file CSV.")
         except Exception as e:
-            print(f"Errore durante il caricamento del file '{file_path}': {e}")
+            print(f"Errore caricamento file CSV: {e}")
             return {}
     return data
 
-# Logging configurato a livello DEBUG
 log_file = "scrapy_animeworld.log"
 if os.path.exists(log_file):
     os.remove(log_file)
@@ -187,8 +153,10 @@ def scrape_animeworld():
     csv_file_path = "anime_list.csv"
     max_pages_to_scrape = 500
     
-    if not esegui_login(base_url):
-        log("Procedo senza autenticazione corretta (i link potrebbero non comparire).", "warning")
+    # Verifica iniziale del cookie di sessione
+    if not carica_cookie_e_verifica(base_url):
+        log("[CRITICO] Impossibile autenticare la sessione tramite cookie.txt. Arresto forzato.", "error")
+        sys.exit(1)
     
     main_list_url = f"{base_url}/az-list"
     main_list_html = get_html_content(main_list_url)
@@ -231,7 +199,6 @@ def scrape_animeworld():
             anime_page_html = get_html_content(anime_page_url)
             
             if anime_page_html:
-                # DEBUG SULLA STRINGA GREZZA
                 stringa_presente = "alternativeDownloadLink" in anime_page_html
                 logging.debug(f"[GREZZO] La parola 'alternativeDownloadLink' è presente nel testo HTML? {stringa_presente}")
 
