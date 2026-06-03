@@ -17,16 +17,17 @@ else:
   
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
+# Inizializzazione della sessione HTTP globale
 session = requests.Session()
 
 def carica_cookie_e_verifica(base_url):
     """
-    Legge il cookie dal file cookie.txt e verifica se la sessione è valida
-    cercando l'avatar o il nome utente nella Home Page.
+    Legge il cookie sessionId dal file generato da Browserless 
+    e valida la sessione sulla Home Page.
     """
     cookie_file = "cookie.txt"
     if not os.path.exists(cookie_file):
-        print(f"[ERRORE] File '{cookie_file}' non trovato. Crealo e inserisci il valore di sessionId.")
+        print(f"[ERRORE] File '{cookie_file}' non trovato. Esegui prima rinnova_cookie.py.")
         return False
         
     with open(cookie_file, 'r', encoding='utf-8') as f:
@@ -36,51 +37,64 @@ def carica_cookie_e_verifica(base_url):
         print(f"[ERRORE] Il file '{cookie_file}' è vuoto.")
         return False
 
-    # Iniettiamo il NUOVO cookie sessionId nella sessione di requests
+    # Iniettiamo il cookie sessionId per il dominio corretto
     session.cookies.set('sessionId', cookie_valore, domain='www.animeworld.ac')
     
-    # Test di verifica sulla Home Page
     try:
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
         }
-        response = session.get(base_url, headers=headers, timeout=10, verify=False)
+        response = session.get(base_url, headers=headers, timeout=15, verify=False)
         response.raise_for_status()
         
-        # Verifica se siamo loggati (cerchiamo la stringa del tuo utente o il menu del profilo nell'HTML)
-        if "zuppazappa" in response.text.lower() or "logout" in response.text.lower():
-            print("[OK] Sessione verificata con successo via cookie.txt! Modalità autenticata attiva.")
+        # Se siamo loggati correttamente tramite il cookie, nel codice compare il tasto di logout
+        if "logout" in response.text.lower() or "zuppazappa" in response.text.lower():
+            print("[OK] Autenticazione verificata via cookie.txt! Sessione attiva.")
             return True
         else:
-            print("[ERRORE] Il cookie inserito in cookie.txt non è valido o è scaduto (Accesso negato).")
+            print("[ERRORE] Il cookie in cookie.txt è scaduto o non valido (Ospite anonimo).")
             return False
     except Exception as e:
-        print(f"[ERRORE] Impossibile contattare il server per verificare il cookie: {e}")
+        print(f"[ERRORE] Impossibile verificare la validità del cookie: {e}")
         return False
 
 def get_html_content(url):
+    """
+    Recupera l'HTML usando la sessione autenticata, gestendo il keep-alive
+    e un timeout robusto per evitare i freeze di Cloudflare.
+    """
     try:
         headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+            'Connection': 'keep-alive'
         }
-        response = session.get(url, headers=headers, timeout=10, verify=False, allow_redirects=True)
+        # Timeout strutturato: 5 secondi per la connessione, 30 per la lettura dei dati
+        response = session.get(url, headers=headers, timeout=(5, 30), verify=False, allow_redirects=True)
         response.raise_for_status()
-        logging.debug(f"[HTTP] URL: {url} -> URL Finale: {response.url} | Dimensione: {len(response.text)} byte")
         return response.text
+    except requests.exceptions.Timeout:
+        print(f"[TIMEOUT] Il server ha impiegato troppo tempo a rispondere per l'URL: {url}")
+        return None
     except requests.exceptions.RequestException as e:
-        print(f"Errore durante il recupero di {url}: {e}")
+        print(f"Errore di rete su {url}: {e}")
         return None
 
 def get_episode_numbers(html_content):
+    """
+    Estrae il numero del primo e dell'ultimo episodio basandosi sulla nuova struttura /play/
+    """
     soup = BeautifulSoup(html_content, 'html.parser')
     primo_episodio = '-1'
     ultimo_episodio = '-1'
 
+    # Selettore per la nuova lista episodi laterale/inferiore nella pagina del player
     episode_links = soup.select('ul.episodes.range li.episode a')
     if episode_links:
         primo_episodio = episode_links[0].get('data-episode-num', '-1')
         ultimo_episodio = episode_links[-1].get('data-episode-num', '-1')
 
+    # Fallback sul box delle info tecniche <dt> se il selettore precedente fallisce
     episodes_dt_tag = soup.find('dt', string='Episodi:')
     if episodes_dt_tag:
         episodes_dd_tag = episodes_dt_tag.find_next_sibling('dd')
@@ -128,6 +142,7 @@ def load_anime_list(file_path):
             return {}
     return data
 
+# Configurazione del file di log principale
 log_file = "scrapy_animeworld.log"
 if os.path.exists(log_file):
     os.remove(log_file)
@@ -135,7 +150,7 @@ logging.basicConfig(
     filename=log_file,
     filemode='a',
     format='%(asctime)s [%(levelname)s] %(message)s',
-    level=logging.DEBUG,
+    level=logging.INFO,
     force=True
 )
 
@@ -153,9 +168,9 @@ def scrape_animeworld():
     csv_file_path = "anime_list.csv"
     max_pages_to_scrape = 500
     
-    # Verifica iniziale del cookie di sessione
+    # Sbarramento di sicurezza: se il cookie non è valido, abortisce subito
     if not carica_cookie_e_verifica(base_url):
-        log("[CRITICO] Impossibile autenticare la sessione tramite cookie.txt. Arresto forzato.", "error")
+        log("[CRITICO] Autenticazione fallita o cookie scaduto. Esegui il rinnovo automatico.", "error")
         sys.exit(1)
     
     main_list_url = f"{base_url}/az-list"
@@ -167,7 +182,7 @@ def scrape_animeworld():
             max_pages_to_scrape = int(match.group(1))
             log(f"Trovato il numero totale di pagine: {max_pages_to_scrape}", "info")
 
-    log("Inizio dell'estrazione...", "info")
+    log("Inizio dell'estrazione dei media...", "info")
     existing_anime_data = load_anime_list(csv_file_path)
 
     page_number = 1
@@ -195,13 +210,11 @@ def scrape_animeworld():
 
             log(f"  Recupero dettagli per: {anime_title}", "info")
 
+            # L'href punta già alla pagina del player /play/nome-anime.ID
             anime_page_url = f"{base_url}{item['href']}"
             anime_page_html = get_html_content(anime_page_url)
             
             if anime_page_html:
-                stringa_presente = "alternativeDownloadLink" in anime_page_html
-                logging.debug(f"[GREZZO] La parola 'alternativeDownloadLink' è presente nel testo HTML? {stringa_presente}")
-
                 primo_episodio_nuovo, ultimo_episodio_nuovo = get_episode_numbers(anime_page_html)
                 if primo_episodio_nuovo == '-1' or ultimo_episodio_nuovo == '-1':
                     log(f"  Episodi non trovati per {anime_title}, salto...", "warning")
@@ -246,10 +259,12 @@ def scrape_animeworld():
                             existing_anime_data[download_path] = data_to_add
                             log(f"  Aggiunto: {anime_title} episodi {primo_episodio_nuovo} - {ultimo_episodio_nuovo}", "info")
                     else:
-                        log(f"   [WARN] Link di download alternativo non trovato per '{anime_title}'", "warning")
+                        log(f"   [WARN] Link di download alternativo non trovato per '{anime_title}' (Verifica cookie)", "warning")
             else:
                 log(f"  Impossibile recuperare la pagina dell'anime: {anime_title}", "error")
+        
         page_number += 1
+        time.sleep(1.5) # Piccolo delay precauzionale tra le pagine dell'indice
 
     sorted_anime_data = dict(sorted(existing_anime_data.items(), key=lambda x: x[1].get('ultimoaggiornamento', ''), reverse=True))
     
@@ -259,7 +274,7 @@ def scrape_animeworld():
         for row in sorted_anime_data.values():
             writer.writerow(row)
 
-    log(f"\nEstrazione completata!", "info")
+    log(f"\nEstrazione completata con successo! Aggiornato file '{csv_file_path}'.", "info")
 
 if __name__ == "__main__":
     scrape_animeworld()
