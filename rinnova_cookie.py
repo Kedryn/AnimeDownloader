@@ -79,14 +79,18 @@ async def rinnova_cookie():
             )
             page = await context.new_page()
             
-            # 1. Navigazione verso la pagina di login
-            # Adatta l'endpoint /login in base alla struttura reale del sito
+            # 1. Navigazione verso la pagina di login (Modificato wait_until)
             url_login = f"{base_url.rstrip('/')}/login"
             print(f"Navigazione su {url_login}...")
-            await page.goto(url_login, timeout=45000, wait_until="networkidle")
             
-            # 2. Compilazione Form di Login
-            # Modifica i selettori CSS (es. 'input[name="username"]') in base al codice HTML del sito
+            # Usiamo 'domcontentloaded' per non rimanere appesi alle connessioni pubblicitarie di background
+            await page.goto(url_login, timeout=45000, wait_until="domcontentloaded")
+            
+            # 2. Compilazione Form di Login (Aggiunto wait_for_selector)
+            print("Attesa visibilità campi credenziali...")
+            # Sostituisci i selettori se il sito usa ID o classi diverse (es: '#username' o '#password')
+            await page.wait_for_selector('input[name="username"]', timeout=15000)
+            
             print("Inserimento credenziali...")
             await page.fill('input[name="username"]', username)
             await page.fill('input[name="password"]', password)
@@ -96,8 +100,12 @@ async def rinnova_cookie():
             # Sostituisci con il selettore corretto del bottone di submit (es. 'button[type="submit"]')
             await page.click('button[type="submit"]')
             
-            # Attende che la navigazione post-login si sia stabilizzata
-            await page.wait_for_load_state("networkidle", timeout=30000)
+            # Aspettiamo che la pagina post-login carichi la struttura base
+            print("Attesa reindirizzamento post-login...")
+            await page.wait_for_load_state("domcontentloaded", timeout=20000)
+            
+            # Piccolo stop di sicurezza di 3 secondi per dare tempo al server di rilasciare i cookie
+            await page.wait_for_timeout(30000) # 3 secondi di tolleranza
             
             # Verifichiamo se siamo entrati controllando i cookie generati
             cookies = await context.cookies()
@@ -106,8 +114,7 @@ async def rinnova_cookie():
                 print("Login effettuato con successo. Estrazione cookie in corso...")
                 salva_cookie_formato_netscape(cookies, cookie_file)
             else:
-                print("ATTENZIONE: Login completato ma nessun cookie di sessione rilevato. Verificare i selettori CSS.")
-                # Salviamo comunque per debug
+                print("ATTENZIONE: Login completato ma nessun cookie di sessione rilevato. Verificare i selettori CSS o le credenziali.")
                 salva_cookie_formato_netscape(cookies, cookie_file)
                 
             await browser.close()
