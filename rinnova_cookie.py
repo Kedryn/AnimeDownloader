@@ -32,15 +32,15 @@ def carica_configurazione():
         print(f"ERRORE CRITICO: Il file '{CONFIG_FILE}' non è un JSON valido. Controlla la sintassi.")
         sys.exit(1)
 
-def salva_cookie_formato_netscape(cookies, output_file):
+def salva_cookie_puro_sessionid(cookies, output_file):
     """
-    Estrae esclusivamente il valore del sessionId di AnimeWorld
-    e lo salva nel file di testo in formato pulito.
+    Cerca il cookie 'sessionId' di AnimeWorld e salva esclusivamente 
+    il suo valore come stringa pulita. Elimina la spazzatura pubblicitaria.
     """
     try:
         session_value = None
         
-        # Cerchiamo il cookie sessionId specifico di AnimeWorld
+        # Scansione chirurgica dei cookie estratti da Playwright
         for c in cookies:
             if "animeworld" in c["domain"].lower() and c["name"] == "sessionId":
                 session_value = c["value"]
@@ -48,14 +48,13 @@ def salva_cookie_formato_netscape(cookies, output_file):
         
         if session_value:
             with open(output_file, "w", encoding="utf-8") as f:
-                # Scriviamo solo il valore puro del cookie, senza intestazioni o tabulazioni
-                f.write(session_value)
+                # Scrive solo il token di sessione puro, senza intestazioni o tabulazioni
+                f.write(session_value.strip())
             
             os.chmod(output_file, 0o777)
             print(f"Successo: Estratto e salvato solo il sessionId in: {output_file}")
         else:
             print("ATTENZIONE: Cookie 'sessionId' di AnimeWorld non trovato nel contesto del browser!")
-            # Opzionale: se Scrapy vuole comunque il file vuoto o l'ultimo valido, non sovrascriviamo
             
     except Exception as e:
         print(f"Errore nel salvataggio del file cookie: {e}")
@@ -80,16 +79,13 @@ async def rinnova_cookie():
             )
             page = await context.new_page()
             
-            # 1. Navigazione verso la pagina di login (Modificato wait_until)
+            # 1. Navigazione verso la pagina di login (Usa domcontentloaded per evitare blocchi pubblicitari)
             url_login = f"{base_url.rstrip('/')}/login"
             print(f"Navigazione su {url_login}...")
-            
-            # Usiamo 'domcontentloaded' per non rimanere appesi alle connessioni pubblicitarie di background
             await page.goto(url_login, timeout=45000, wait_until="domcontentloaded")
             
-            # 2. Compilazione Form di Login (Aggiunto wait_for_selector)
+            # 2. Verifica e compilazione Form di Login
             print("Attesa visibilità campi credenziali...")
-            # Sostituisci i selettori se il sito usa ID o classi diverse (es: '#username' o '#password')
             await page.wait_for_selector('input[name="username"]', timeout=15000)
             
             print("Inserimento credenziali...")
@@ -98,25 +94,20 @@ async def rinnova_cookie():
             
             # 3. Invio della richiesta
             print("Invio form di login...")
-            # Sostituisci con il selettore corretto del bottone di submit (es. 'button[type="submit"]')
             await page.click('button[type="submit"]')
             
-            # Aspettiamo che la pagina post-login carichi la struttura base
+            # Aspetta il caricamento della struttura della pagina successiva
             print("Attesa reindirizzamento post-login...")
             await page.wait_for_load_state("domcontentloaded", timeout=20000)
             
-            # Piccolo stop di sicurezza di 3 secondi per dare tempo al server di rilasciare i cookie
-            await page.wait_for_timeout(30000) # 3 secondi di tolleranza
+            # Pausa di tolleranza di 3 secondi per consentire il rilascio completo del cookie di sessione
+            await page.wait_for_timeout(3000)
             
-            # Verifichiamo se siamo entrati controllando i cookie generati
+            # Estrazione dei cookie generati nel contesto
             cookies = await context.cookies()
             
-            if any(c['name'] for c in cookies if 'session' in c['name'].lower() or 'auth' in c['name'].lower() or 'user' in c['name'].lower()):
-                print("Login effettuato con successo. Estrazione cookie in corso...")
-                salva_cookie_formato_netscape(cookies, cookie_file)
-            else:
-                print("ATTENZIONE: Login completato ma nessun cookie di sessione rilevato. Verificare i selettori CSS o le credenziali.")
-                salva_cookie_formato_netscape(cookies, cookie_file)
+            # Elaborazione e salvataggio mirato
+            salva_cookie_puro_sessionid(cookies, cookie_file)
                 
             await browser.close()
             
@@ -125,5 +116,5 @@ async def rinnova_cookie():
             sys.exit(1)
 
 if __name__ == "__main__":
-    # Esecuzione del ciclo asincrono richiesto da Playwright
+    # Avvio del ciclo asincrono nativo per Playwright
     asyncio.run(rinnova_cookie())
