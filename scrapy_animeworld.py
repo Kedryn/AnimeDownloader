@@ -4,277 +4,282 @@ from bs4 import BeautifulSoup
 import csv
 import time
 import os
-import logging
-import urllib3
 import re
 import sys
+import logging
+import urllib3
 
-if "force" in [arg.lower() for arg in sys.argv]:
-  forza = True
-  print("Forzatura dell'aggiornamento dei dati...")
-else:
-  forza = False
+# Gestione parametri di input
+args = [arg.lower() for arg in sys.argv]
+forza = "force" in args
+aggiorna_server_mode = "aggiornaserver" in args
+
+# Configurazione logging (console + file)
+log_file = "scrapy_animeworld.log"
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] %(message)s',
+    handlers=[
+        logging.FileHandler(log_file, mode='a', encoding='utf-8'),
+        logging.StreamHandler(sys.stdout)
+    ]
+)
+
+if forza:
+    logging.info("Forzatura dell'aggiornamento dei dati attiva...")
+if aggiorna_server_mode:
+    logging.info("[MODE] Modalità AGGIORNASERVER attiva: aggiornamento chirurgico dei nodi host...")
   
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-
-# Inizializzazione della sessione HTTP globale
 session = requests.Session()
+BASE_URL = "https://www.animeworld.ac"
+CSV_FILE_PATH = "anime_list.csv"
 
-def carica_cookie_e_verifica(base_url):
-    """
-    Legge il cookie sessionId dal file generato da Browserless 
-    e valida la sessione sulla Home Page.
-    """
+FIELDNAMES = [
+    'url_primo_episodio', 
+    'primo_episodio', 
+    'ultimo_episodio',
+    'stagione_episodio', 
+    'download_path',
+    'titolo', 
+    'url_pagina_anime', 
+    'ultimoaggiornamento'
+]
+
+def carica_cookie_e_verifica():
     cookie_file = "cookie.txt"
     if not os.path.exists(cookie_file):
-        print(f"[ERRORE] File '{cookie_file}' non trovato. Esegui prima rinnova_cookie.py.")
+        logging.error(f"File '{cookie_file}' non trovato.")
         return False
-        
     with open(cookie_file, 'r', encoding='utf-8') as f:
         cookie_valore = f.read().strip()
-        
     if not cookie_valore:
-        print(f"[ERRORE] Il file '{cookie_file}' è vuoto.")
         return False
 
-    # Iniettiamo il cookie sessionId per il dominio corretto
     session.cookies.set('sessionId', cookie_valore, domain='www.animeworld.ac')
-    
     try:
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-        }
-        response = session.get(base_url, headers=headers, timeout=15, verify=False)
-        response.raise_for_status()
-        
-        # Se siamo loggati correttamente tramite il cookie, nel codice compare il tasto di logout
+        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
+        response = session.get(BASE_URL, headers=headers, timeout=15, verify=False)
         if "logout" in response.text.lower() or "zuppazappa" in response.text.lower():
-            print("[OK] Autenticazione verificata via cookie.txt! Sessione attiva.")
             return True
-        else:
-            print("[ERRORE] Il cookie in cookie.txt è scaduto o non valido (Ospite anonimo).")
-            return False
+        return False
     except Exception as e:
-        print(f"[ERRORE] Impossibile verificare la validità del cookie: {e}")
+        logging.error(f"Verifica cookie fallita: {e}")
         return False
 
 def get_html_content(url):
-    """
-    Recupera l'HTML usando la sessione autenticata, gestendo il keep-alive
-    e un timeout robusto per evitare i freeze di Cloudflare.
-    """
     try:
         headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
             'Connection': 'keep-alive'
         }
-        # Timeout strutturato: 5 secondi per la connessione, 30 per la lettura dei dati
         response = session.get(url, headers=headers, timeout=(5, 30), verify=False, allow_redirects=True)
         response.raise_for_status()
         return response.text
-    except requests.exceptions.Timeout:
-        print(f"[TIMEOUT] Il server ha impiegato troppo tempo a rispondere per l'URL: {url}")
-        return None
-    except requests.exceptions.RequestException as e:
-        print(f"Errore di rete su {url}: {e}")
+    except Exception as e:
+        logging.error(f"Errore di rete su {url}: {e}")
         return None
 
 def get_episode_numbers(html_content):
-    """
-    Estrae il numero del primo e dell'ultimo episodio basandosi sulla nuova struttura /play/
-    """
     soup = BeautifulSoup(html_content, 'html.parser')
-    primo_episodio = '-1'
-    ultimo_episodio = '-1'
-
-    # Selettore per la nuova lista episodi laterale/inferiore nella pagina del player
+    primo, ultimo = '-1', '-1'
     episode_links = soup.select('ul.episodes.range li.episode a')
     if episode_links:
-        primo_episodio = episode_links[0].get('data-episode-num', '-1')
-        ultimo_episodio = episode_links[-1].get('data-episode-num', '-1')
-
-    # Fallback sul box delle info tecniche <dt> se il selettore precedente fallisce
-    episodes_dt_tag = soup.find('dt', string='Episodi:')
-    if episodes_dt_tag:
-        episodes_dd_tag = episodes_dt_tag.find_next_sibling('dd')
-        if episodes_dd_tag:
-            episodes_text = episodes_dd_tag.get_text(strip=True)
-            if episodes_text.isdigit():
-                ultimo_episodio = episodes_text
-            elif episodes_text == '??':
-                if primo_episodio.isdigit():
-                    ultimo_episodio = '9' * len(primo_episodio)
-                else:
-                    ultimo_episodio = '99'
-
-    if primo_episodio.isdigit():
-        primo_episodio = primo_episodio.zfill(2)
-    if ultimo_episodio.isdigit():
-        ultimo_episodio = ultimo_episodio.zfill(2)
-
-    return primo_episodio, ultimo_episodio
+        primo = episode_links[0].get('data-episode-num', '-1').zfill(2)
+        ultimo = episode_links[-1].get('data-episode-num', '-1').zfill(2)
+    return primo, ultimo
 
 def sanitize_title(title):
-    title = title.replace(':', '-')
-    title = title.replace('/', '-')
-    title = title.replace('\'', '-')
-    title = title.replace('"', '-')
-    title = title.replace('’', '-')
-    title = title.replace('?', '')
+    for char in [':', '/', '\'', '"', '’', '?']:
+        title = title.replace(char, '')
     return title
 
-def load_anime_list(file_path):
+def load_anime_list():
+    """
+    Mappa il dizionario usando il TITOLO REALE come chiave primaria 
+    per evitare disallineamenti di sanitizzazione stringhe.
+    """
     data = {}
-    if os.path.exists(file_path):
+    if os.path.exists(CSV_FILE_PATH):
         try:
-            with open(file_path, 'r', newline='', encoding='utf-8') as file:
+            with open(CSV_FILE_PATH, 'r', newline='', encoding='utf-8') as file:
                 reader = csv.reader(file, delimiter='#')
-                fieldnames = ['url_primo_episodio', 'primo_episodio', 'ultimo_episodio','stagione_episodio', 'download_path','titolo','ultimoaggiornamento']
                 for row in reader:
-                    if len(row) <= len(fieldnames):
-                        row += [''] * (len(fieldnames) - len(row))
-                        row_dict = dict(zip(fieldnames, row))
-                        data[row_dict['download_path']] = row_dict
-            print(f"Caricati {len(data)} anime esistenti dal file CSV.")
+                    if len(row) < len(FIELDNAMES):
+                        if len(row) == 7:
+                            row.insert(6, '')
+                        else:
+                            row += [''] * (len(FIELDNAMES) - len(row))
+                    elif len(row) > len(FIELDNAMES):
+                        row = row[:len(FIELDNAMES)]
+                        
+                    row_dict = dict(zip(FIELDNAMES, row))
+                    # Usiamo il titolo originale memorizzato nel CSV come chiave di confronto
+                    chiave_titolo = row_dict['titolo'].strip()
+                    data[chiave_titolo] = row_dict
+            logging.info(f"Caricati {len(data)} anime esistenti dal file CSV.")
         except Exception as e:
-            print(f"Errore caricamento file CSV: {e}")
-            return {}
+            logging.error(f"Errore caricamento CSV: {e}")
     return data
 
-# Configurazione del file di log principale
-log_file = "scrapy_animeworld.log"
-if os.path.exists(log_file):
-    os.remove(log_file)
-logging.basicConfig(
-    filename=log_file,
-    filemode='a',
-    format='%(asctime)s [%(levelname)s] %(message)s',
-    level=logging.INFO,
-    force=True
-)
+def esegui_aggiornamento_server(existing_anime_data):
+    logging.info("[AGGIORNASERVER] Analisi dei server unici nel CSV...")
+    server_mappa_esca = {}
+    
+    for titolo, info in existing_anime_data.items():
+        url = info['url_primo_episodio']
+        if not info['url_pagina_anime']:
+            continue
+            
+        match = re.search(r'https://([^.]+)', url)
+        if match:
+            srv_root_match = re.search(r'(srv\d+)', match.group(1))
+            if srv_root_match:
+                srv_root = srv_root_match.group(1)
+                if srv_root not in server_mappa_esca:
+                    server_mappa_esca[srv_root] = titolo
 
-def log(message, level="info"):
-    print(message)
-    if level == "info":
-        logging.info(message)
-    elif level == "warning":
-        logging.warning(message)
-    elif level == "error":
-        logging.error(message)
+    if not server_mappa_esca:
+        logging.warning("[AGGIORNASERVER] Nessun server con URL pagina associato trovato nel CSV. Esegui prima una scansione standard.")
+        return
+
+    logging.info(f"[AGGIORNASERVER] Rilevati {len(server_mappa_esca)} server unici da verificare.")
+    tabella_conversione = {}
+
+    for srv_root, titolo in server_mappa_esca.items():
+        info = existing_anime_data[titolo]
+        url_target_page = info['url_pagina_anime']
+        
+        logging.info(f"Verifico server [{srv_root}] tramite la pagina: {url_target_page}")
+        
+        anime_page_html = get_html_content(url_target_page)
+        if not anime_page_html:
+            logging.error(f"  [FALLITO] Impossibile raggiungere la pagina del player per {info['titolo']}")
+            continue
+            
+        soup_anime = BeautifulSoup(anime_page_html, 'html.parser')
+        dl_link = soup_anime.select_one('#alternativeDownloadLink')
+        
+        if dl_link:
+            url_nuovo = dl_link['href']
+            host_match_nuovo = re.search(r'https://([^/]+)', url_nuovo)
+            host_match_vecchio = re.search(r'https://([^/]+)', info['url_primo_episodio'])
+            
+            if host_match_nuovo and host_match_vecchio:
+                nuovo_host = host_match_nuovo.group(1)
+                vecchio_host = host_match_vecchio.group(1)
+                
+                if vecchio_host != nuovo_host:
+                    tabella_conversione[vecchio_host] = nuovo_host
+                    logging.info(f"  [CAMBIO RILEVATO] Server risultante modificato: {vecchio_host} ===> {nuovo_host}")
+                else:
+                    logging.info(f"  [CONFERMATO] Server risultante invariato: {nuovo_host}")
+            else:
+                logging.warning(f"  [WARN] Impossibile estrarre l'hostname dai link per {info['titolo']}")
+        else:
+            logging.warning(f"  [WARN] Elemento #alternativeDownloadLink non trovato nella pagina di {info['titolo']}.")
+            
+        time.sleep(1.5)
+
+    if tabella_conversione:
+        logging.info("[AGGIORNASERVER] Applicazione modifiche massive al database in memoria...")
+        contatore_modifiche = 0
+        for titolo, info in existing_anime_data.items():
+            url_corrente = info['url_primo_episodio']
+            for vecchio, nuovo in tabella_conversione.items():
+                if vecchio in url_corrente:
+                    existing_anime_data[titolo]['url_primo_episodio'] = url_corrente.replace(vecchio, nuovo)
+                    existing_anime_data[titolo]['ultimoaggiornamento'] = time.strftime('%Y-%m-%d')
+                    contatore_modifiche += 1
+        
+        logging.info(f"[AGGIORNASERVER] Sostituiti {contatore_modifiche} link obsoleti nel database.")
+        salva_csv(existing_anime_data)
+    else:
+        logging.info("[AGGIORNASERVER] Tutti i nodi sono allineati nel CSV. Nessuna modifica eseguita.")
+
+def salva_csv(anime_data):
+    sorted_anime_data = dict(sorted(anime_data.items(), key=lambda x: x[1].get('ultimoaggiornamento', ''), reverse=True))
+    with open(CSV_FILE_PATH, 'w', newline='', encoding='utf-8') as file:
+        writer = csv.DictWriter(file, fieldnames=FIELDNAMES, delimiter='#')
+        for row in sorted_anime_data.values():
+            writer.writerow(row)
+    logging.info(f"[DUMP] Scrittura completata su '{CSV_FILE_PATH}'.")
 
 def scrape_animeworld():
-    base_url = "https://www.animeworld.ac"
-    csv_file_path = "anime_list.csv"
-    max_pages_to_scrape = 500
-    
-    # Sbarramento di sicurezza: se il cookie non è valido, abortisce subito
-    if not carica_cookie_e_verifica(base_url):
-        log("[CRITICO] Autenticazione fallita o cookie scaduto. Esegui il rinnovo automatico.", "error")
+    if not carica_cookie_e_verifica():
+        logging.error("[CRITICO] Autenticazione fallita o cookie scaduto.")
         sys.exit(1)
-    
-    main_list_url = f"{base_url}/az-list"
-    main_list_html = get_html_content(main_list_url)
+        
+    existing_anime_data = load_anime_list()
 
+    if aggiorna_server_mode:
+        esegui_aggiornamento_server(existing_anime_data)
+        return
+
+    max_pages_to_scrape = 500
+    main_list_html = get_html_content(f"{BASE_URL}/az-list")
     if main_list_html:
         match = re.search(r'window\.paginationMaxPage\s*=\s*parseInt\("(\d+)"\);', main_list_html)
-        if match:
-            max_pages_to_scrape = int(match.group(1))
-            log(f"Trovato il numero totale di pagine: {max_pages_to_scrape}", "info")
+        if match: max_pages_to_scrape = int(match.group(1))
 
-    log("Inizio dell'estrazione dei media...", "info")
-    existing_anime_data = load_anime_list(csv_file_path)
-
+    logging.info("Inizio dell'estrazione standard dei media...")
     page_number = 1
     while page_number <= max_pages_to_scrape:
-        list_url = f"{base_url}/az-list?page={page_number}"
-        log(f"Processo lista a pagina: {page_number}", "info")
-        list_html = get_html_content(list_url)
-
-        if not list_html:
-            break
+        logging.info(f"Processo lista a pagina: {page_number}")
+        list_html = get_html_content(f"{BASE_URL}/az-list?page={page_number}")
+        if not list_html: break
                 
-        list_soup = BeautifulSoup(list_html, 'html.parser')
-        anime_items = list_soup.select('div.items a.name')
+        anime_items = BeautifulSoup(list_html, 'html.parser').select('div.items a.name')
+        if not anime_items: break
 
-        if not anime_items:
-            break
+        pagina_modificata = False
 
         for item in anime_items:
             anime_title = item.get('data-jtitle', '').strip().replace('#', '')
-            download_path = sanitize_title(anime_title)
-            is_existing = download_path in existing_anime_data
+            
+            # CONFRONTO BLINDATO: Verifica se il titolo nativo della pagina è già censito
+            is_existing = anime_title in existing_anime_data
 
             if is_existing and not forza:
                 continue
 
-            log(f"  Recupero dettagli per: {anime_title}", "info")
-
-            # L'href punta già alla pagina del player /play/nome-anime.ID
-            anime_page_url = f"{base_url}{item['href']}"
+            anime_page_url = f"{BASE_URL}{item['href']}"
             anime_page_html = get_html_content(anime_page_url)
             
             if anime_page_html:
-                primo_episodio_nuovo, ultimo_episodio_nuovo = get_episode_numbers(anime_page_html)
-                if primo_episodio_nuovo == '-1' or ultimo_episodio_nuovo == '-1':
-                    log(f"  Episodi non trovati per {anime_title}, salto...", "warning")
-                else:
-                    soup_anime = BeautifulSoup(anime_page_html, 'html.parser')
-                    first_episode_link = soup_anime.select_one('#alternativeDownloadLink')
+                primo, ultimo = get_episode_numbers(anime_page_html)
+                soup_anime = BeautifulSoup(anime_page_html, 'html.parser')
+                dl_link = soup_anime.select_one('#alternativeDownloadLink')
 
-                    if first_episode_link:
-                        episode_url_nuovo = first_episode_link['href']
-                        log(f"   [OK] Link alternativo trovato per '{anime_title}': {episode_url_nuovo}", "info")
-                        
-                        match = re.search(r'_(\d+)_(?:SUB|ITA)', episode_url_nuovo)
-                        if match:
-                            episode_num_from_url = match.group(1)
-                            if episode_num_from_url in ['01', '001', '0001', '00']:
-                                episode_url_nuovo = re.sub(r'Ep_\d+_(SUB|ITA)', 'Ep_*_\\1', episode_url_nuovo)
+                if dl_link:
+                    episode_url_nuovo = dl_link['href']
+                    match = re.search(r'_(\d+)_(?:SUB|ITA)', episode_url_nuovo)
+                    if match and match.group(1) in ['01', '001', '0001', '00']:
+                        episode_url_nuovo = re.sub(r'Ep_\d+_(SUB|ITA)', 'Ep_*_\\1', episode_url_nuovo)
 
-                        ultimoaggiornamento = ""
-                        if download_path in existing_anime_data and existing_anime_data[download_path]['ultimoaggiornamento'] == "":
-                            ultimoaggiornamento = '1900-01-01'
-                        elif download_path in existing_anime_data:
-                            ultimoaggiornamento = existing_anime_data[download_path]['ultimoaggiornamento']
+                    download_path = sanitize_title(anime_title)
+                    ultimoaggiornamento = existing_anime_data[anime_title]['ultimoaggiornamento'] if is_existing else time.strftime('%Y-%m-%d')
+                    if is_existing and forza and ultimo > existing_anime_data[anime_title]['ultimo_episodio']:
+                        ultimoaggiornamento = time.strftime('%Y-%m-%d')
 
-                        data_to_add = {
-                            'url_primo_episodio': episode_url_nuovo,
-                            'ultimo_episodio': ultimo_episodio_nuovo,
-                            'stagione_episodio': '01',
-                            'download_path': download_path,
-                            'titolo': anime_title,
-                            'ultimoaggiornamento': ultimoaggiornamento
-                        }
-
-                        if is_existing and forza:
-                            data_to_add['primo_episodio'] = existing_anime_data[download_path]['primo_episodio']
-                            if ultimo_episodio_nuovo > existing_anime_data[download_path]['ultimo_episodio']:
-                                data_to_add['ultimoaggiornamento'] = time.strftime('%Y-%m-%d')
-                            existing_anime_data[download_path] = data_to_add
-                            log(f"  Aggiornato: {anime_title}", "info")
-                        else:
-                            data_to_add['ultimoaggiornamento'] = time.strftime('%Y-%m-%d')
-                            data_to_add['primo_episodio'] = primo_episodio_nuovo
-                            existing_anime_data[download_path] = data_to_add
-                            log(f"  Aggiunto: {anime_title} episodi {primo_episodio_nuovo} - {ultimo_episodio_nuovo}", "info")
-                    else:
-                        log(f"   [WARN] Link di download alternativo non trovato per '{anime_title}' (Verifica cookie)", "warning")
-            else:
-                log(f"  Impossibile recuperare la pagina dell'anime: {anime_title}", "error")
+                    existing_anime_data[anime_title] = {
+                        'url_primo_episodio': episode_url_nuovo,
+                        'primo_episodio': existing_anime_data[anime_title]['primo_episodio'] if (is_existing and forza) else primo,
+                        'ultimo_episodio': ultimo,
+                        'stagione_episodio': '01',
+                        'download_path': download_path,
+                        'titolo': anime_title,
+                        'url_pagina_anime': anime_page_url,
+                        'ultimoaggiornamento': ultimoaggiornamento
+                    }
+                    pagina_modificata = True
+        
+        if pagina_modificata:
+            salva_csv(existing_anime_data)
         
         page_number += 1
-        time.sleep(1.5) # Piccolo delay precauzionale tra le pagine dell'indice
-
-    sorted_anime_data = dict(sorted(existing_anime_data.items(), key=lambda x: x[1].get('ultimoaggiornamento', ''), reverse=True))
-    
-    fieldnames = ['url_primo_episodio', 'primo_episodio', 'ultimo_episodio','stagione_episodio', 'download_path','titolo','ultimoaggiornamento']
-    with open(csv_file_path, 'w', newline='', encoding='utf-8') as file:
-        writer = csv.DictWriter(file, fieldnames=fieldnames, delimiter='#')
-        for row in sorted_anime_data.values():
-            writer.writerow(row)
-
-    log(f"\nEstrazione completata con successo! Aggiornato file '{csv_file_path}'.", "info")
+        time.sleep(1.5)
 
 if __name__ == "__main__":
     scrape_animeworld()
