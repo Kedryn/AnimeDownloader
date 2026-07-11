@@ -264,7 +264,7 @@ if __name__ == "__main__":
             nome_display = riga[5] if len(riga) > 5 else f"Riga {idx_corrente}"
 
             if int(riga[1]) > int(riga[2]):
-                scrivilogfile(f"Salto {nome_display}: Già completata ({riga[2]}/{riga[2]})", 2, 'INFO', yellow)
+                scrivilogfile(f"SALTO >>> {nome_display}: Già completata ({riga[2]}/{riga[2]})", 2, 'INFO', yellow)
             else:
                 ripeti = 1
                 while ripeti == 1 and int(riga[1]) <= int(riga[2]):
